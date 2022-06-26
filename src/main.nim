@@ -10,3 +10,6 @@ while true:
       echo "Quit"
       break
    var parser = line.parse()
+   if parser.diagnostics.len > 0:
+      for d in parser.diagnostics:
+         writeLine(stdout, d)

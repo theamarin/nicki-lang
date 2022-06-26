@@ -16,6 +16,8 @@ type
       lexer: Lexer
       position: int
       root: Node
+      diagnostics*: seq[string]
+
 
 func `$`(node: Node): string =
    result = $node.kind & ": "
@@ -36,9 +38,11 @@ func next(parser: var Parser): Token =
    result = parser.current
    parser.position.inc
 
-func match(parser: var Parser, kind: TokenKind): Token =
+func match(parser: var Parser, kind: TokenKind): Token {.discardable.} =
    if parser.current.kind == kind:
       return parser.next
+   parser.diagnostics.add("Error: Unexpected token " & escape($parser.current.kind) &
+         ", expected " & escape($kind))
    return Token()
 
 func parseNumber(parser: var Parser): Node =
@@ -49,17 +53,23 @@ func parseBinaryExpression(parser: var Parser): Node =
    let token = parser.match(token_number)
    return Node(kind: node_number, numberToken: token)
 
-
-func parse*(text: string): Parser =
-   var parser = Parser()
-   parser.lexer = text.lex
-
+func parseExpression(parser: var Parser): Node =
    var left = parser.parseNumber
 
    while parser.current.kind in [token_plus, token_minus]:
       let operatorToken = parser.next
       let right = parser.parseNumber
       left = Node(kind: node_binary_expression, left: left, op: operatorToken, right: right)
+   return left
+
+
+func parse*(text: string): Parser =
+   var parser = Parser()
+   parser.lexer = text.lex
+   parser.diagnostics = parser.lexer.getDiagnostics
+
+   let left = parser.parseExpression
+   parser.match(token_eof)
 
    parser.root = left
    debugEcho $parser.root

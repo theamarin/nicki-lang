@@ -28,6 +28,9 @@ type
       text: string
       position: int
       tokens: seq[Token]
+      diagnostics: seq[string]
+
+func getDiagnostics*(lexer: Lexer): seq[string] = lexer.diagnostics
 
 
 func current(l: Lexer): char =
@@ -69,6 +72,7 @@ func nextToken(l: var Lexer): Token =
    elif l.current() == ')':
       return Token(kind: token_paranthesis_close, position: l.next, text: ")")
    else:
+      l.diagnostics.add("Error: Bad character input: " & escape($l.current()))
       let text: string = $l.text[l.position]
       return Token(kind: token_bad, position: l.next, text: text)
 
