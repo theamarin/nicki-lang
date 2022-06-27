@@ -23,7 +23,7 @@ type
       diagnostics*: seq[string]
 
 
-func `$`(node: Node): string =
+func `$`*(node: Node): string =
    result = $node.kind & ": "
    case node.kind
    of node_number: result &= $node.numberToken
@@ -98,7 +98,6 @@ func parse*(text: string): Parser =
    parser.match(token_eof)
 
    parser.root = left
-   debugEcho $parser.root
    return parser
 
 
