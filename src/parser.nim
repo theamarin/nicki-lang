@@ -10,12 +10,12 @@ type
       of node_number: numberToken: Token
       of node_binary_expression:
          left, right: Node
-         op: Token
+         operatorToken: Token
 
    Parser = ref object
       lexer: Lexer
       position: int
-      root: Node
+      root*: Node
       diagnostics*: seq[string]
 
 
@@ -26,7 +26,7 @@ func `$`(node: Node): string =
    of node_binary_expression:
       result &= "\p"
       result &= indent($node.left, 3) & "\p"
-      result &= indent($node.op, 3) & "\p"
+      result &= indent($node.operatorToken, 3) & "\p"
       result &= indent($node.right, 3)
 
 func peek(parser: Parser, offset: int = 0): Token =
@@ -59,7 +59,8 @@ func parseExpression(parser: var Parser): Node =
    while parser.current.kind in [token_plus, token_minus]:
       let operatorToken = parser.next
       let right = parser.parseNumber
-      left = Node(kind: node_binary_expression, left: left, op: operatorToken, right: right)
+      left = Node(kind: node_binary_expression, left: left,
+            operatorToken: operatorToken, right: right)
    return left
 
 
@@ -74,3 +75,20 @@ func parse*(text: string): Parser =
    parser.root = left
    debugEcho $parser.root
    return parser
+
+
+
+func evaluate*(node: Node): int =
+   case node.kind
+   of node_number: return node.numberToken.value
+   of node_binary_expression:
+      let left = node.left.evaluate
+      let right = node.right.evaluate
+      case node.operatorToken.kind
+      of token_plus: return left + right
+      of token_minus: return left - right
+      of token_star: return left * right
+      of token_slash: return left div right
+      else: raise newException(ValueError, "Unexpected binary operator " & escape(
+            $node.operatorToken.kind))
+   else: raise newException(ValueError, "Unexpected node " & escape($node.kind))

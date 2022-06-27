@@ -13,3 +13,5 @@ while true:
    if parser.diagnostics.len > 0:
       for d in parser.diagnostics:
          writeLine(stdout, d)
+   else:
+      writeline(stdout, $parser.root.evaluate)

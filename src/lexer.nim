@@ -13,13 +13,13 @@ type
       token_paranthesis_close
       token_eof
    Token* = ref object
-      case kind: TokenKind
-      of token_number: value: int
+      case kind*: TokenKind
+      of token_number: value*: int
       else: discard
       position: int
       text: string
 
-func kind*(token: Token): TokenKind = token.kind
+# func kind*(token: Token): TokenKind = token.kind
 func `$`*(token: Token): string =
    result = $token.kind
 
@@ -52,7 +52,11 @@ func nextToken(l: var Lexer): Token =
       let start = l.position
       while l.current() in Digits: l.next
       let text = l.text.substr(start, l.position - 1)
-      let value = parseInt(text)
+      let value =
+         try: parseInt(text)
+         except ValueError as e:
+            l.diagnostics.add("Cannot parse number: " & escape(text))
+            0
       return Token(kind: token_number, position: l.position, text: text, value: value)
    elif l.current() in Whitespace:
       let start = l.position
