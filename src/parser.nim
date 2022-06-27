@@ -1,5 +1,5 @@
 import strutils
-import lexer
+import lexer, syntaxfacts
 
 type
    NodeKind* = enum
@@ -55,11 +55,6 @@ func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
          ", expected " & escape($kind))
    return Token()
 
-func getBinaryOperatorPrecedence(tokenKind: TokenKind): int =
-   case tokenKind
-   of token_minus, token_plus: return 1
-   of token_star, token_slash: return 2
-   else: return 0
 
 func parseExpression(parser: var Parser): Node
 
