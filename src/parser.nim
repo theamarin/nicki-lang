@@ -44,22 +44,28 @@ func peek(parser: Parser, offset: int = 0): Token =
 
 func current(parser: Parser): Token = parser.peek()
 
-func next(parser: var Parser): Token =
+func nextToken(parser: var Parser): Token =
    result = parser.current
    parser.position.inc
 
 func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
    if parser.current.kind == kind:
-      return parser.next
+      return parser.nextToken
    parser.diagnostics.add("Error: Unexpected token " & escape($parser.current.kind) &
          ", expected " & escape($kind))
    return Token()
+
+func getBinaryOperatorPrecedence(tokenKind: TokenKind): int =
+   case tokenKind
+   of token_minus, token_plus: return 1
+   of token_star, token_slash: return 2
+   else: return 0
 
 func parseExpression(parser: var Parser): Node
 
 func parsePrimaryExpression(parser: var Parser): Node =
    if parser.current.kind == token_paranthesis_open:
-      let open = parser.next
+      let open = parser.nextToken
       let expression = parser.parseExpression
       let close = parser.matchToken(token_paranthesis_close)
       return Node(kind: node_paranthesis_expression, open: open, expression: expression, close: close)
@@ -67,27 +73,18 @@ func parsePrimaryExpression(parser: var Parser): Node =
       let token = parser.matchToken(token_number)
       return Node(kind: node_literal, literalToken: token)
 
-func parseFactor(parser: var Parser): Node =
-   var left = parser.parsePrimaryExpression
-
-   while parser.current.kind in [token_star, token_slash]:
-      let operatorToken = parser.next
-      let right = parser.parsePrimaryExpression
-      left = Node(kind: node_binary_expression, left: left,
+func parseBinaryExpression(parser: var Parser, parentPrecedence = 0): Node =
+   result = parser.parsePrimaryExpression
+   while true:
+      var precedence = getBinaryOperatorPrecedence(parser.current.kind)
+      if precedence == 0 or precedence <= parentPrecedence:
+         break
+      let operatorToken = parser.nextToken
+      let right = parser.parseBinaryExpression(precedence)
+      result = Node(kind: node_binary_expression, left: result,
             operatorToken: operatorToken, right: right)
-   return left
 
-func parseTerm(parser: var Parser): Node =
-   var left = parser.parseFactor
-
-   while parser.current.kind in [token_plus, token_minus]:
-      let operatorToken = parser.next
-      let right = parser.parseFactor
-      left = Node(kind: node_binary_expression, left: left,
-            operatorToken: operatorToken, right: right)
-   return left
-
-func parseExpression(parser: var Parser): Node = parser.parseTerm
+func parseExpression(parser: var Parser): Node = parser.parseBinaryExpression
 
 func parse*(text: string): Parser =
    var parser = Parser()
