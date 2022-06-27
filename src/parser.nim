@@ -2,19 +2,19 @@ import strutils
 import lexer
 
 type
-   NodeKind = enum
+   NodeKind* = enum
       node_number = "number"
       node_binary_expression = "binary expression"
       node_paranthesis_expression = "paranthesis expression"
    Node* = ref object
-      case kind: NodeKind
-      of node_number: numberToken: Token
+      case kind*: NodeKind
+      of node_number: numberToken*: Token
       of node_binary_expression:
-         left, right: Node
-         operatorToken: Token
+         left*, right*: Node
+         operatorToken*: Token
       of node_paranthesis_expression:
-         open, close: Token
-         expression: Node
+         open*, close*: Token
+         expression*: Node
 
    Parser = ref object
       lexer: Lexer
@@ -99,21 +99,3 @@ func parse*(text: string): Parser =
 
    parser.root = left
    return parser
-
-
-func evaluate*(node: Node): int =
-   case node.kind
-   of node_number: return node.numberToken.value
-   of node_binary_expression:
-      let left = node.left.evaluate
-      let right = node.right.evaluate
-      case node.operatorToken.kind
-      of token_plus: return left + right
-      of token_minus: return left - right
-      of token_star: return left * right
-      of token_slash: return left div right
-      else: raise newException(ValueError, "Unexpected binary operator " & escape(
-            $node.operatorToken.kind))
-   of node_paranthesis_expression:
-      return node.expression.evaluate
-   else: raise newException(ValueError, "Unexpected node " & escape($node.kind))
