@@ -50,7 +50,8 @@ func nextToken(l: var Lexer): Token =
    # whitespace
    if l.position >= l.text.len:
       return Token(kind: token_eof, position: l.position, text: "\0")
-   if l.current() in Digits:
+   case l.current()
+   of Digits:
       let start = l.position
       while l.current() in Digits: l.next
       let text = l.text.substr(start, l.position - 1)
@@ -60,22 +61,22 @@ func nextToken(l: var Lexer): Token =
             l.diagnostics.add("Cannot parse number: " & escape(text))
             0
       return Token(kind: token_number, position: l.position, text: text, value: value)
-   elif l.current() in Whitespace:
+   of Whitespace:
       let start = l.position
       while l.current() in Whitespace: l.next
       let text = l.text.substr(start, l.position - 1)
       return Token(kind: token_whitespace, position: l.position, text: text)
-   elif l.current() == '+':
+   of '+':
       return Token(kind: token_plus, position: l.next, text: "+")
-   elif l.current() == '-':
+   of '-':
       return Token(kind: token_minus, position: l.next, text: "-")
-   elif l.current() == '*':
+   of '*':
       return Token(kind: token_star, position: l.next, text: "*")
-   elif l.current() == '/':
+   of '/':
       return Token(kind: token_slash, position: l.next, text: "/")
-   elif l.current() == '(':
+   of '(':
       return Token(kind: token_paranthesis_open, position: l.next, text: "(")
-   elif l.current() == ')':
+   of ')':
       return Token(kind: token_paranthesis_close, position: l.next, text: ")")
    else:
       l.diagnostics.add("Error: Bad character input: " & escape($l.current()))
