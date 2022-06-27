@@ -5,7 +5,7 @@ type
    NodeKind = enum
       node_number = "number"
       node_binary_expression = "binary expression"
-   Node = ref object
+   Node* = ref object
       case kind: NodeKind
       of node_number: numberToken: Token
       of node_binary_expression:
@@ -45,20 +45,26 @@ func match(parser: var Parser, kind: TokenKind): Token {.discardable.} =
          ", expected " & escape($kind))
    return Token()
 
-func parseNumber(parser: var Parser): Node =
+func parsePrimaryExpression(parser: var Parser): Node =
    let token = parser.match(token_number)
    return Node(kind: node_number, numberToken: token)
 
-func parseBinaryExpression(parser: var Parser): Node =
-   let token = parser.match(token_number)
-   return Node(kind: node_number, numberToken: token)
+func parseFactor(parser: var Parser): Node =
+   var left = parser.parsePrimaryExpression
 
-func parseExpression(parser: var Parser): Node =
-   var left = parser.parseNumber
+   while parser.current.kind in [token_star, token_slash]:
+      let operatorToken = parser.next
+      let right = parser.parsePrimaryExpression
+      left = Node(kind: node_binary_expression, left: left,
+            operatorToken: operatorToken, right: right)
+   return left
+
+func parseTerm(parser: var Parser): Node =
+   var left = parser.parseFactor
 
    while parser.current.kind in [token_plus, token_minus]:
       let operatorToken = parser.next
-      let right = parser.parseNumber
+      let right = parser.parseFactor
       left = Node(kind: node_binary_expression, left: left,
             operatorToken: operatorToken, right: right)
    return left
@@ -69,13 +75,12 @@ func parse*(text: string): Parser =
    parser.lexer = text.lex
    parser.diagnostics = parser.lexer.getDiagnostics
 
-   let left = parser.parseExpression
+   let left = parser.parseTerm
    parser.match(token_eof)
 
    parser.root = left
    debugEcho $parser.root
    return parser
-
 
 
 func evaluate*(node: Node): int =
