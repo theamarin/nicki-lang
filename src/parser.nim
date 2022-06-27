@@ -3,12 +3,13 @@ import lexer
 
 type
    NodeKind* = enum
-      node_number = "number"
+      node_literal = "literal"
       node_binary_expression = "binary expression"
       node_paranthesis_expression = "paranthesis expression"
+
    Node* = ref object
       case kind*: NodeKind
-      of node_number: numberToken*: Token
+      of node_literal: literalToken*: Token
       of node_binary_expression:
          left*, right*: Node
          operatorToken*: Token
@@ -26,7 +27,7 @@ type
 func `$`*(node: Node): string =
    result = $node.kind & ": "
    case node.kind
-   of node_number: result &= $node.numberToken
+   of node_literal: result &= $node.literalToken
    of node_binary_expression:
       result &= "\p"
       result &= indent($node.left, 3) & "\p"
@@ -47,7 +48,7 @@ func next(parser: var Parser): Token =
    result = parser.current
    parser.position.inc
 
-func match(parser: var Parser, kind: TokenKind): Token {.discardable.} =
+func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
    if parser.current.kind == kind:
       return parser.next
    parser.diagnostics.add("Error: Unexpected token " & escape($parser.current.kind) &
@@ -56,16 +57,15 @@ func match(parser: var Parser, kind: TokenKind): Token {.discardable.} =
 
 func parseExpression(parser: var Parser): Node
 
-
 func parsePrimaryExpression(parser: var Parser): Node =
    if parser.current.kind == token_paranthesis_open:
       let open = parser.next
       let expression = parser.parseExpression
-      let close = parser.match(token_paranthesis_close)
+      let close = parser.matchToken(token_paranthesis_close)
       return Node(kind: node_paranthesis_expression, open: open, expression: expression, close: close)
    else:
-      let token = parser.match(token_number)
-      return Node(kind: node_number, numberToken: token)
+      let token = parser.matchToken(token_number)
+      return Node(kind: node_literal, literalToken: token)
 
 func parseFactor(parser: var Parser): Node =
    var left = parser.parsePrimaryExpression
@@ -95,7 +95,7 @@ func parse*(text: string): Parser =
    parser.diagnostics = parser.lexer.getDiagnostics
 
    let left = parser.parseExpression
-   parser.match(token_eof)
+   parser.matchToken(token_eof)
 
    parser.root = left
    return parser

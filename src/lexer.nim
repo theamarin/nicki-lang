@@ -3,6 +3,8 @@ import strutils
 type
    TokenKind* = enum
       token_bad
+      token_eof
+
       token_whitespace
       token_number
       token_plus
@@ -11,7 +13,7 @@ type
       token_slash
       token_paranthesis_open
       token_paranthesis_close
-      token_eof
+
    Token* = ref object
       case kind*: TokenKind
       of token_number: value*: int

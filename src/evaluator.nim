@@ -6,7 +6,7 @@ import parser, lexer
 
 func evaluate*(node: Node): int =
    case node.kind
-   of node_number: return node.numberToken.value
+   of node_literal: return node.literalToken.value
    of node_binary_expression:
       let left = node.left.evaluate
       let right = node.right.evaluate
