@@ -1,4 +1,5 @@
 import strutils
+import dtype
 
 type
    TokenKind* = enum
@@ -16,7 +17,7 @@ type
 
    Token* = ref object
       case kind*: TokenKind
-      of token_number: value*: int
+      of token_number: valInt*: int
       else: discard
       position: int
       text: string
@@ -43,6 +44,22 @@ func next(l: var Lexer): int {.discardable.} =
    l.position.inc
    return l.position
 
+func lexNumber(l: var Lexer): Token =
+   let start = l.position
+   while l.current() in Digits: l.next
+   let text = l.text.substr(start, l.position - 1)
+   let valInt =
+      try: parseInt(text)
+      except ValueError as e:
+         l.diagnostics.add("Cannot parse number: " & escape(text))
+         0
+   return Token(kind: token_number, position: l.position, text: text, valInt: valInt)
+
+func lexWhitespace(l: var Lexer): Token =
+   let start = l.position
+   while l.current() in Whitespace: l.next
+   let text = l.text.substr(start, l.position - 1)
+   return Token(kind: token_whitespace, position: l.position, text: text)
 
 func nextToken(l: var Lexer): Token =
    # numbers
@@ -52,20 +69,9 @@ func nextToken(l: var Lexer): Token =
       return Token(kind: token_eof, position: l.position, text: "\0")
    case l.current()
    of Digits:
-      let start = l.position
-      while l.current() in Digits: l.next
-      let text = l.text.substr(start, l.position - 1)
-      let value =
-         try: parseInt(text)
-         except ValueError as e:
-            l.diagnostics.add("Cannot parse number: " & escape(text))
-            0
-      return Token(kind: token_number, position: l.position, text: text, value: value)
+      return l.lexNumber
    of Whitespace:
-      let start = l.position
-      while l.current() in Whitespace: l.next
-      let text = l.text.substr(start, l.position - 1)
-      return Token(kind: token_whitespace, position: l.position, text: text)
+      return l.lexWhitespace
    of '+':
       return Token(kind: token_plus, position: l.next, text: "+")
    of '-':
