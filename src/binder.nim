@@ -1,4 +1,4 @@
-import strutils
+import strutils, tables
 import parser, lexer, dtype
 
 type
@@ -6,11 +6,35 @@ type
       bound_unary_identity,
       bound_unary_negation,
 
+   BoundUnaryOperatorMatch = tuple
+      tokenKind: TokenKind
+      operandDtype: Dtype
+   BoundUnaryOperatorResult = tuple
+      operatorKind: BoundUnaryOperatorKind
+      resultDtype: Dtype
+   BoundUnaryOperator = tuple
+      match: BoundUnaryOperatorMatch
+      result: BoundUnaryOperatorResult
+   BoundUnaryOperators = Table[BoundUnaryOperatorMatch, BoundUnaryOperatorResult]
+
    BoundBinaryOperatorKind* = enum
       bound_binary_addition,
       bound_binary_subtraction,
       bound_binary_multiplication,
       bound_binary_division
+
+   BoundBinaryOperatorMatch = tuple
+      leftDtype: Dtype
+      tokenKind: TokenKind
+      rightDtype: Dtype
+   BoundBinaryOperatorResult = tuple
+      operatorKind: BoundBinaryOperatorKind
+      resultDtype: Dtype
+   BoundBinaryOperator = tuple
+      match: BoundBinaryOperatorMatch
+      result: BoundBinaryOperatorResult
+   BoundBinaryOperators = Table[BoundBinaryOperatorMatch, BoundBinaryOperatorResult]
+
 
    BoundKind* = enum
       bound_literal_expression = "literal expression",
@@ -34,20 +58,32 @@ type
       root: Bound
       diagnostics: seq[string]
 
-func getUnaryOperatorKind(kind: TokenKind): BoundUnaryOperatorKind =
-   case kind
-   of token_plus: return bound_unary_identity
-   of token_minus: return bound_unary_negation
-   else: raise (ref Exception)(msg: "Unexpected unary operator " & escape($kind))
+const
+   boundUnaryOperatorList: seq[BoundUnaryOperator] = @[
+      ((token_plus, tint), (bound_unary_identity, tint)),
+      ((token_minus, tint), (bound_unary_negation, tint)),
+   ]
+   boundUnaryOperators: BoundUnaryOperators = boundUnaryOperatorList.toTable
+
+   boundBinaryOperatorList: seq[BoundBinaryOperator] = @[
+      ((tint, token_plus, tint), (bound_binary_addition, tint)),
+      ((tint, token_minus, tint), (bound_binary_subtraction, tint)),
+   ]
+   boundBinaryOperators: BoundBinaryOperators = boundBinaryOperatorList.toTable
 
 
-func getBinaryOperatorKind(kind: TokenKind): BoundBinaryOperatorKind =
-   case kind
-   of token_plus: return bound_binary_addition
-   of token_minus: return bound_binary_subtraction
-   of token_star: return bound_binary_multiplication
-   of token_slash: return bound_binary_division
-   else: raise (ref Exception)(msg: "Unexpected binary operator " & escape($kind))
+func getUnaryOperator(kind: TokenKind, dtype: Dtype): BoundUnaryOperatorResult =
+   if (kind, dtype) in boundUnaryOperators: return boundUnaryOperators[(kind, dtype)]
+   else: raise (ref Exception)(msg: "Unary operator " & escape($kind) &
+         " not defined for dtype " & escape($dtype))
+
+
+func getBinaryOperator(leftDtype: Dtype, kind: TokenKind,
+      rightDtype: Dtype): BoundBinaryOperatorResult =
+   if (leftDtype, kind, rightDtype) in boundBinaryOperators: return boundBinaryOperators[
+         (leftDtype, kind, rightDtype)]
+   else: raise (ref Exception)(msg: "Binary operator " & escape($kind) &
+         " not defined for dtypes " & escape($leftDtype) & " and " & escape($rightDtype))
 
 func bindExpression(binder: Binder, node: Node): Bound
 
@@ -56,7 +92,7 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
    case node.literalToken.kind
    of token_number:
       let value = Value(dtype: tint, valInt: node.literalToken.valInt)
-      return Bound(kind: bound_literal_expression, value: value)
+      return Bound(kind: bound_literal_expression, value: value, dtype: tint)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literalToken.kind))
 
@@ -64,17 +100,18 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == node_unary_expression
    let operand = binder.bindExpression(node.unaryOperand)
-   let operatorKind = getUnaryOperatorKind(node.unaryOperator.kind)
+   let (operatorKind, resultDtype) = getUnaryOperator(node.unaryOperator.kind, operand.dtype)
    return Bound(kind: bound_unary_expression, unaryOperator: operatorKind,
-         unaryOperand: operand)
+         unaryOperand: operand, dtype: resultDtype)
 
 func bindBinaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == node_binary_expression
    let boundLeft = binder.bindExpression(node.left)
-   let operatorKind = getBinaryOperatorKind(node.binaryOperator.kind)
    let boundRight = binder.bindExpression(node.right)
+   let (operatorKind, resultDtype) = getBinaryOperator(boundLeft.dtype,
+         node.binaryOperator.kind, boundRight.dtype)
    return Bound(kind: bound_binary_expression, binaryLeft: boundLeft,
-         binaryRight: boundRight, binaryOperator: operatorKind)
+         binaryRight: boundRight, binaryOperator: operatorKind, dtype: resultDtype)
 
 func bindExpression(binder: Binder, node: Node): Bound =
    case node.kind
