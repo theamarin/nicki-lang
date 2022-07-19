@@ -6,7 +6,7 @@ import parser, lexer
 
 func evaluate*(node: Node): int =
    case node.kind
-   of node_literal: return node.literalToken.value
+   of node_literal: return node.literalToken.valInt
    of node_unary_expression:
       case node.unaryOperator.kind
       of token_plus: return node.unaryOperand.evaluate
