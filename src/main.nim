@@ -1,4 +1,4 @@
-import parser, evaluator
+import parser, binder, evaluator
 
 
 var showTree = false
@@ -15,5 +15,12 @@ while true:
    if parser.diagnostics.len > 0:
       for d in parser.diagnostics:
          writeLine(stdout, d)
-   else:
-      writeline(stdout, $parser.root.evaluate)
+      continue
+
+   var binder = newBinder(parser.root)
+   if binder.diagnostics.len > 0:
+      for d in binder.diagnostics:
+         writeLine(stdout, d)
+      continue
+
+   writeline(stdout, $binder.root.evaluate)

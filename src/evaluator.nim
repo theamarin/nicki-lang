@@ -1,28 +1,18 @@
-import strutils
+import dtype, binder
 
-import parser, lexer
-
-
-
-func evaluate*(node: Node): int =
+func evaluate*(node: Bound): Value =
    case node.kind
-   of nodeLiteral: return node.literalToken.valInt
-   of nodeUnaryExpression:
-      case node.unaryOperator.kind
-      of tokenPlus: return node.unaryOperand.evaluate
-      of tokenMinus: return -node.unaryOperand.evaluate
-      else: raise newException(ValueError, "Unexpected unary operator " & escape(
-            $node.unaryOperator.kind))
-   of nodeBinaryExpression:
-      let left = node.left.evaluate
-      let right = node.right.evaluate
-      case node.binaryOperator.kind
-      of tokenPlus: return left + right
-      of tokenMinus: return left - right
-      of tokenStar: return left * right
-      of tokenSlash: return left div right
-      else: raise newException(ValueError, "Unexpected binary operator " & escape(
-            $node.binaryOperator.kind))
-   of nodeParanthesisExpression:
-      return node.expression.evaluate
-   # else: raise newException(ValueError, "Unexpected node " & escape($node.kind))
+   of boundLiteralExpression: return node.value
+   of boundUnaryExpression:
+      case node.unaryOperator
+      of boundUnaryPlus: return node.unaryOperand.evaluate
+      of boundUnaryMinus: return node.unaryOperand.evaluate.negative
+      of boundUnaryNot: return node.unaryOperand.evaluate.logicalNot
+   of boundBinaryExpression:
+      let left = node.binaryLeft.evaluate
+      let right = node.binaryRight.evaluate
+      case node.binaryOperator
+      of boundBinaryAddition: return left + right
+      of boundBinarySubtraction: return left - right
+      of boundBinaryMultiplication: return left * right
+      of boundBinaryDivision: return left div right
