@@ -1,23 +1,22 @@
 import strutils
-import dtype
 
 type
    TokenKind* = enum
-      token_bad
-      token_eof
+      tokenBad
+      tokenEof
 
-      token_whitespace
-      token_number
-      token_plus
-      token_minus
-      token_star
-      token_slash
-      token_paranthesis_open
-      token_paranthesis_close
+      tokenWhitespace
+      tokenNumber
+      tokenPlus
+      tokenMinus
+      tokenStar
+      tokenSlash
+      tokenParanthesisOpen
+      tokenParanthesisClose
 
    Token* = ref object
       case kind*: TokenKind
-      of token_number: valInt*: int
+      of tokenNumber: valInt*: int
       else: discard
       position: int
       text: string
@@ -50,53 +49,53 @@ func lexNumber(l: var Lexer): Token =
    let text = l.text.substr(start, l.position - 1)
    let valInt =
       try: parseInt(text)
-      except ValueError as e:
+      except ValueError:
          l.diagnostics.add("Cannot parse number: " & escape(text))
          0
-   return Token(kind: token_number, position: l.position, text: text, valInt: valInt)
+   return Token(kind: tokenNumber, position: l.position, text: text, valInt: valInt)
 
 func lexWhitespace(l: var Lexer): Token =
    let start = l.position
    while l.current() in Whitespace: l.next
    let text = l.text.substr(start, l.position - 1)
-   return Token(kind: token_whitespace, position: l.position, text: text)
+   return Token(kind: tokenWhitespace, position: l.position, text: text)
 
 func nextToken(l: var Lexer): Token =
    # numbers
    # operators: + - * / ( )
    # whitespace
    if l.position >= l.text.len:
-      return Token(kind: token_eof, position: l.position, text: "\0")
+      return Token(kind: tokenEof, position: l.position, text: "\0")
    case l.current()
    of Digits:
       return l.lexNumber
    of Whitespace:
       return l.lexWhitespace
    of '+':
-      return Token(kind: token_plus, position: l.next, text: "+")
+      return Token(kind: tokenPlus, position: l.next, text: "+")
    of '-':
-      return Token(kind: token_minus, position: l.next, text: "-")
+      return Token(kind: tokenMinus, position: l.next, text: "-")
    of '*':
-      return Token(kind: token_star, position: l.next, text: "*")
+      return Token(kind: tokenStar, position: l.next, text: "*")
    of '/':
-      return Token(kind: token_slash, position: l.next, text: "/")
+      return Token(kind: tokenSlash, position: l.next, text: "/")
    of '(':
-      return Token(kind: token_paranthesis_open, position: l.next, text: "(")
+      return Token(kind: tokenParanthesisOpen, position: l.next, text: "(")
    of ')':
-      return Token(kind: token_paranthesis_close, position: l.next, text: ")")
+      return Token(kind: tokenParanthesisClose, position: l.next, text: ")")
    else:
       l.diagnostics.add("Error: Bad character input: " & escape($l.current()))
       let text: string = $l.text[l.position]
-      return Token(kind: token_bad, position: l.next, text: text)
+      return Token(kind: tokenBad, position: l.next, text: text)
 
 func lex*(text: string): Lexer =
    result = Lexer(text: text)
 
    while true:
       let token = result.nextToken()
-      if token.kind notin [token_whitespace, token_bad]:
+      if token.kind notin [tokenWhitespace, tokenBad]:
          result.tokens.add(token)
-      if token.kind == token_eof:
+      if token.kind == tokenEof:
          break
 
 func get*(lexer: Lexer, index: int): Token =

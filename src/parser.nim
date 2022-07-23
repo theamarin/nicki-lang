@@ -3,21 +3,21 @@ import lexer, syntaxfacts
 
 type
    NodeKind* = enum
-      node_literal = "literal"
-      node_unary_expression = "unary expression"
-      node_binary_expression = "binary expression"
-      node_paranthesis_expression = "paranthesis expression"
+      nodeLiteral = "literal"
+      nodeUnaryExpression = "unary expression"
+      nodeBinaryExpression = "binary expression"
+      nodeParanthesisExpression = "paranthesis expression"
 
    Node* = ref object
       case kind*: NodeKind
-      of node_literal: literalToken*: Token
-      of node_unary_expression:
+      of nodeLiteral: literalToken*: Token
+      of nodeUnaryExpression:
          unaryOperator*: Token
          unaryOperand*: Node
-      of node_binary_expression:
+      of nodeBinaryExpression:
          left*, right*: Node
          binaryOperator*: Token
-      of node_paranthesis_expression:
+      of nodeParanthesisExpression:
          open*, close*: Token
          expression*: Node
 
@@ -31,17 +31,17 @@ type
 func `$`*(node: Node): string =
    result = $node.kind & ": "
    case node.kind
-   of node_literal: result &= $node.literalToken
-   of node_unary_expression:
+   of nodeLiteral: result &= $node.literalToken
+   of nodeUnaryExpression:
       result &= "\p"
       result &= indent($node.unaryOperator, 3) & "\p"
       result &= indent($node.unaryOperand, 3)
-   of node_binary_expression:
+   of nodeBinaryExpression:
       result &= "\p"
       result &= indent($node.left, 3) & "\p"
       result &= indent($node.binaryOperator, 3) & "\p"
       result &= indent($node.right, 3)
-   of node_paranthesis_expression:
+   of nodeParanthesisExpression:
       result &= "\p"
       result &= indent($node.open, 3) & "\p"
       result &= indent($node.expression, 3) & "\p"
@@ -66,21 +66,21 @@ func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
 func parseExpression(parser: var Parser, parentPrecedence = 0): Node
 
 func parsePrimaryExpression(parser: var Parser): Node =
-   if parser.current.kind == token_paranthesis_open:
+   if parser.current.kind == tokenParanthesisOpen:
       let open = parser.nextToken
       let expression = parser.parseExpression
-      let close = parser.matchToken(token_paranthesis_close)
-      return Node(kind: node_paranthesis_expression, open: open, expression: expression, close: close)
+      let close = parser.matchToken(tokenParanthesisClose)
+      return Node(kind: nodeParanthesisExpression, open: open, expression: expression, close: close)
    else:
-      let token = parser.matchToken(token_number)
-      return Node(kind: node_literal, literalToken: token)
+      let token = parser.matchToken(tokenNumber)
+      return Node(kind: nodeLiteral, literalToken: token)
 
 func parseExpression(parser: var Parser, parentPrecedence = 0): Node =
    let unaryOperatorPrecedence = getUnaryOperatorPrecedence(parser.current.kind)
    if unaryOperatorPrecedence != 0 and unaryOperatorPrecedence >= parentPrecedence:
       let operatorToken = parser.nextToken
       let operand = parser.parseExpression(unaryOperatorPrecedence)
-      result = Node(kind: node_unary_expression, unaryOperator: operatorToken,
+      result = Node(kind: nodeUnaryExpression, unaryOperator: operatorToken,
             unaryOperand: operand)
    else:
       result = parser.parsePrimaryExpression
@@ -91,7 +91,7 @@ func parseExpression(parser: var Parser, parentPrecedence = 0): Node =
          break
       let binaryOperator = parser.nextToken
       let right = parser.parseExpression(precedence)
-      result = Node(kind: node_binary_expression, left: result,
+      result = Node(kind: nodeBinaryExpression, left: result,
             binaryOperator: binaryOperator, right: right)
 
 
@@ -101,7 +101,7 @@ func parse*(text: string): Parser =
    parser.diagnostics = parser.lexer.getDiagnostics
 
    let left = parser.parseExpression
-   parser.matchToken(token_eof)
+   parser.matchToken(tokenEof)
 
    parser.root = left
    return parser
