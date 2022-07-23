@@ -7,10 +7,25 @@ type
 
       tokenWhitespace
       tokenNumber
+
+      # Operators
+      tokenComma
+      tokenCaret
+      tokenEquals
+      tokenEqualsEquals
+      tokenBang
+      tokenBangEquals
+      tokenPercent
+      tokenAmp
+      tokenAmpAmp
+      tokenPipe
+      tokenPipePipe
       tokenPlus
       tokenMinus
       tokenStar
       tokenSlash
+
+      # Parentheses
       tokenParanthesisOpen
       tokenParanthesisClose
 
@@ -40,8 +55,15 @@ func current(l: Lexer): char =
    return l.text[l.position]
 
 func next(l: var Lexer): int {.discardable.} =
+   result = l.position
    l.position.inc
-   return l.position
+
+
+func peek(l: Lexer, n = 1): char =
+   let pos = l.position + n
+   if pos >= l.text.len: return '\0'
+   return l.text[pos]
+
 
 func lexNumber(l: var Lexer): Token =
    let start = l.position
@@ -60,10 +82,11 @@ func lexWhitespace(l: var Lexer): Token =
    let text = l.text.substr(start, l.position - 1)
    return Token(kind: tokenWhitespace, position: l.position, text: text)
 
+func newToken(l: Lexer, kind: TokenKind, text: string): Token =
+   result = Token(kind: kind, position: l.position, text: text)
+   l.position += text.len
+
 func nextToken(l: var Lexer): Token =
-   # numbers
-   # operators: + - * / ( )
-   # whitespace
    if l.position >= l.text.len:
       return Token(kind: tokenEof, position: l.position, text: "\0")
    case l.current()
@@ -72,17 +95,23 @@ func nextToken(l: var Lexer): Token =
    of Whitespace:
       return l.lexWhitespace
    of '+':
-      return Token(kind: tokenPlus, position: l.next, text: "+")
+      return l.newToken(tokenPlus, "+")
    of '-':
-      return Token(kind: tokenMinus, position: l.next, text: "-")
+      return l.newToken(tokenMinus, "-")
    of '*':
-      return Token(kind: tokenStar, position: l.next, text: "*")
+      return l.newToken(tokenStar, "*")
    of '/':
-      return Token(kind: tokenSlash, position: l.next, text: "/")
+      return l.newToken(tokenSlash, "/")
    of '(':
-      return Token(kind: tokenParanthesisOpen, position: l.next, text: "(")
+      return l.newToken(tokenParanthesisOpen, "(")
    of ')':
-      return Token(kind: tokenParanthesisClose, position: l.next, text: ")")
+      return l.newToken(tokenParanthesisClose, ")")
+   of '&':
+      if l.peek == '&': return l.newToken(tokenAmpAmp, "&&")
+      else: return l.newToken(tokenAmp, "&")
+   of '|':
+      if l.peek == '|': return l.newToken(tokenPipePipe, "||")
+      else: return l.newToken(tokenPipe, "|")
    else:
       l.diagnostics.add("Error: Bad character input: " & escape($l.current()))
       let text: string = $l.text[l.position]
