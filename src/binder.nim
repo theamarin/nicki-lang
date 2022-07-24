@@ -73,18 +73,22 @@ const
    boundBinaryOperators: BoundBinaryOperators = boundBinaryOperatorList.toTable
 
 
-func getUnaryOperator(kind: TokenKind, dtype: Dtype): BoundUnaryOperatorResult =
-   if (kind, dtype) in boundUnaryOperators: return boundUnaryOperators[(kind, dtype)]
-   else: raise (ref Exception)(msg: "Unary operator " & escape($kind) &
-         " not defined for dtype " & escape($dtype))
+func getUnaryOperator(binder: Binder, kind: TokenKind,
+      dtype: Dtype): BoundUnaryOperatorResult =
+   if (kind, dtype) in boundUnaryOperators:
+      return boundUnaryOperators[(kind, dtype)]
+   else:
+      binder.diagnostics.add("Error: Unary operator " & escape($kind) &
+            " not defined for dtype " & escape($dtype))
 
 
-func getBinaryOperator(leftDtype: Dtype, kind: TokenKind,
+func getBinaryOperator(binder: Binder, leftDtype: Dtype, kind: TokenKind,
       rightDtype: Dtype): BoundBinaryOperatorResult =
-   if (leftDtype, kind, rightDtype) in boundBinaryOperators: return boundBinaryOperators[
-         (leftDtype, kind, rightDtype)]
-   else: raise (ref Exception)(msg: "Binary operator " & escape($kind) &
-         " not defined for dtypes " & escape($leftDtype) & " and " & escape($rightDtype))
+   if (leftDtype, kind, rightDtype) in boundBinaryOperators:
+      return boundBinaryOperators[(leftDtype, kind, rightDtype)]
+   else:
+      binder.diagnostics.add("Binary operator " & escape($kind) &
+            " not defined for dtypes " & escape($leftDtype) & " and " & escape($rightDtype))
 
 func bindExpression(binder: Binder, node: Node): Bound
 
@@ -101,7 +105,7 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeUnaryExpression
    let operand = binder.bindExpression(node.unaryOperand)
-   let (operatorKind, resultDtype) = getUnaryOperator(node.unaryOperator.kind, operand.dtype)
+   let (operatorKind, resultDtype) = binder.getUnaryOperator(node.unaryOperator.kind, operand.dtype)
    return Bound(kind: boundUnaryExpression, unaryOperator: operatorKind,
          unaryOperand: operand, dtype: resultDtype)
 
@@ -109,7 +113,7 @@ func bindBinaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeBinaryExpression
    let boundLeft = binder.bindExpression(node.left)
    let boundRight = binder.bindExpression(node.right)
-   let (operatorKind, resultDtype) = getBinaryOperator(boundLeft.dtype,
+   let (operatorKind, resultDtype) = binder.getBinaryOperator(boundLeft.dtype,
          node.binaryOperator.kind, boundRight.dtype)
    return Bound(kind: boundBinaryExpression, binaryLeft: boundLeft,
          binaryRight: boundRight, binaryOperator: operatorKind, dtype: resultDtype)
@@ -125,5 +129,5 @@ func bindExpression(binder: Binder, node: Node): Bound =
    else: raise (ref Exception)(msg: "Unexpected syntax node " & escape($node))
 
 func newBinder*(node: Node): Binder =
-   let root = result.bindExpression(node)
-   result = Binder(root: root)
+   result = Binder()
+   result.root = result.bindExpression(node)

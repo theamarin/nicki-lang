@@ -96,12 +96,11 @@ func parseExpression(parser: var Parser, parentPrecedence = 0): Node =
 
 
 func parse*(text: string): Parser =
-   var parser = Parser()
-   parser.lexer = text.lex
-   parser.diagnostics = parser.lexer.getDiagnostics
+   result = Parser()
+   result.lexer = text.lex
+   result.diagnostics = result.lexer.getDiagnostics
 
-   let left = parser.parseExpression
-   parser.matchToken(tokenEof)
+   let left = result.parseExpression
+   result.matchToken(tokenEof)
 
-   parser.root = left
-   return parser
+   result.root = left
