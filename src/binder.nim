@@ -77,15 +77,16 @@ func getUnaryOperator(binder: Binder, kind: TokenKind,
       dtype: Dtype): BoundUnaryOperatorResult =
    if (kind, dtype) in boundUnaryOperators:
       return boundUnaryOperators[(kind, dtype)]
+   elif dtype == terror: discard
    else:
       binder.diagnostics.add("Error: Unary operator " & escape($kind) &
             " not defined for dtype " & escape($dtype))
-
 
 func getBinaryOperator(binder: Binder, leftDtype: Dtype, kind: TokenKind,
       rightDtype: Dtype): BoundBinaryOperatorResult =
    if (leftDtype, kind, rightDtype) in boundBinaryOperators:
       return boundBinaryOperators[(leftDtype, kind, rightDtype)]
+   elif terror in [leftDtype, rightDtype]: discard
    else:
       binder.diagnostics.add("Binary operator " & escape($kind) &
             " not defined for dtypes " & escape($leftDtype) & " and " & escape($rightDtype))
@@ -126,7 +127,8 @@ func bindExpression(binder: Binder, node: Node): Bound =
       return binder.bindUnaryExpression(node)
    of nodeBinaryExpression:
       return binder.bindBinaryExpression(node)
-   else: raise (ref Exception)(msg: "Unexpected syntax node " & escape($node))
+   of nodeParanthesisExpression:
+      return binder.bindExpression(node.expression)
 
 func newBinder*(node: Node): Binder =
    result = Binder()
