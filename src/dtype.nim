@@ -123,3 +123,10 @@ func `or`*(a, b: Value): Value =
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool or b.valBool)
    else: raiseUnexpectedDtypeException(a.dtype, op)
+
+func `xor`*(a, b: Value): Value =
+   const op = "logical xor"
+   checkDtypesMatch(a.dtype, b.dtype, op)
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool xor b.valBool)
+   else: raiseUnexpectedDtypeException(a.dtype, op)

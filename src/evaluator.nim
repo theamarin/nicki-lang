@@ -24,3 +24,4 @@ func evaluate*(node: Bound): Value =
       of boundBinaryLessEquals: return left <= right
       of boundBinaryLogicalAnd: return left and right
       of boundBinaryLogicalOr: return left or right
+      of boundBinaryLogicalXor: return left xor right

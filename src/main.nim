@@ -20,8 +20,8 @@ while true:
 
    var binder = newBinder(parser.root)
    if binder.diagnostics.len > 0:
-      for d in binder.diagnostics:
-         writeLine(stdout, d)
+      for report in binder.diagnostics:
+         writeLine(stdout, " ".repeat(report.pos+2) & "^  " & report.msg)
       continue
 
    writeline(stdout, $binder.root.evaluate)

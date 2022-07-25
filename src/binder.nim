@@ -1,5 +1,5 @@
 import strutils, tables
-import parser, lexer, dtype
+import parser, lexer, dtype, diagnostics
 
 type
    BoundUnaryOperatorKind* = enum
@@ -31,6 +31,7 @@ type
       boundBinaryLessEquals,
       boundBinaryLogicalAnd,
       boundBinaryLogicalOr
+      boundBinaryLogicalXor
 
    BoundBinaryOperatorMatch = tuple
       leftDtype: Dtype
@@ -65,7 +66,7 @@ type
 
    Binder* = ref object
       root*: Bound
-      diagnostics*: seq[string]
+      diagnostics*: Diagnostics
 
 const
    boundUnaryOperatorList: seq[BoundUnaryOperator] = @[
@@ -97,27 +98,29 @@ const
 
       ((tbool, tokenAmpAmp, tbool), (boundBinaryLogicalAnd, tbool)),
       ((tbool, tokenPipePipe, tbool), (boundBinaryLogicalOr, tbool)),
+      ((tbool, tokenCaret, tbool), (boundBinaryLogicalXor, tbool)),
    ]
    boundBinaryOperators: BoundBinaryOperators = boundBinaryOperatorList.toTable
 
 
-func getUnaryOperator(binder: Binder, kind: TokenKind,
+func getUnaryOperator(binder: Binder, token: Token,
       dtype: Dtype): BoundUnaryOperatorResult =
-   if (kind, dtype) in boundUnaryOperators:
-      return boundUnaryOperators[(kind, dtype)]
+   if (token.kind, dtype) in boundUnaryOperators:
+      return boundUnaryOperators[(token.kind, dtype)]
    elif dtype == terror: discard
    else:
-      binder.diagnostics.add("Error: Unary operator " & escape($kind) &
-            " not defined for dtype " & escape($dtype))
+      binder.diagnostics.report("Error: Unary operator " & escape($token.kind) &
+            " not defined for dtype " & escape($dtype), token.pos)
 
-func getBinaryOperator(binder: Binder, leftDtype: Dtype, kind: TokenKind,
+func getBinaryOperator(binder: Binder, leftDtype: Dtype, token: Token,
       rightDtype: Dtype): BoundBinaryOperatorResult =
-   if (leftDtype, kind, rightDtype) in boundBinaryOperators:
-      return boundBinaryOperators[(leftDtype, kind, rightDtype)]
+   if (leftDtype, token.kind, rightDtype) in boundBinaryOperators:
+      return boundBinaryOperators[(leftDtype, token.kind, rightDtype)]
    elif terror in [leftDtype, rightDtype]: discard
    else:
-      binder.diagnostics.add("Binary operator " & escape($kind) &
-            " not defined for dtypes " & escape($leftDtype) & " and " & escape($rightDtype))
+      binder.diagnostics.report("Binary operator " & escape(
+            $token.kind) & " not defined for dtypes " & escape($leftDtype) & " and " &
+            escape($rightDtype), token.pos)
 
 func bindExpression(binder: Binder, node: Node): Bound
 
@@ -137,7 +140,7 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeUnaryExpression
    let operand = binder.bindExpression(node.unaryOperand)
-   let (operatorKind, resultDtype) = binder.getUnaryOperator(node.unaryOperator.kind, operand.dtype)
+   let (operatorKind, resultDtype) = binder.getUnaryOperator(node.unaryOperator, operand.dtype)
    return Bound(kind: boundUnaryExpression, unaryOperator: operatorKind,
          unaryOperand: operand, dtype: resultDtype)
 
@@ -146,7 +149,7 @@ func bindBinaryExpression(binder: Binder, node: Node): Bound =
    let boundLeft = binder.bindExpression(node.left)
    let boundRight = binder.bindExpression(node.right)
    let (operatorKind, resultDtype) = binder.getBinaryOperator(boundLeft.dtype,
-         node.binaryOperator.kind, boundRight.dtype)
+         node.binaryOperator, boundRight.dtype)
    return Bound(kind: boundBinaryExpression, binaryLeft: boundLeft,
          binaryRight: boundRight, binaryOperator: operatorKind, dtype: resultDtype)
 
