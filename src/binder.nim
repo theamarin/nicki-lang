@@ -71,6 +71,7 @@ const
    boundUnaryOperatorList: seq[BoundUnaryOperator] = @[
       ((tokenPlus, tint), (boundUnaryPlus, tint)),
       ((tokenMinus, tint), (boundUnaryMinus, tint)),
+      ((tokenBang, tbool), (boundUnaryNot, tbool)),
    ]
    boundUnaryOperators: BoundUnaryOperators = boundUnaryOperatorList.toTable
 
