@@ -12,117 +12,114 @@ type
       of tbool: valBool*: bool
       of tint: valInt*: int
 
+func raiseUnexpectedDtypeException(dtype: Dtype, operation: string) =
+   raise newException(ValueError, "Unexpected dtype " & escape($dtype) & " for " & operation)
+
+func checkDtypesMatch(dtypeA, dtypeB: Dtype, operation: string) =
+   if dtypeA != dtypeB:
+      raise newException(ValueError, "Dtypes " & escape($dtypeA) & " and " & escape(
+         $dtypeB) & " differ for " & operation)
 
 func negative*(x: Value): Value =
+   const op = "negation"
    case x.dtype
    of tint: return Value(dtype: tint, valInt: -x.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($x.dtype) & " for negation")
+   else: raiseUnexpectedDtypeException(x.dtype, op)
 
 func logicalNot*(x: Value): Value =
+   const op = "logicalNot"
    case x.dtype
    of tbool: return Value(dtype: tbool, valBool: not x.valBool)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($x.dtype) & " for logical not")
+   else: raiseUnexpectedDtypeException(x.dtype, op)
 
 func `+`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for addition")
+   const op = "addition"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tint: return Value(dtype: tint, valInt: a.valInt + b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for addition")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `-`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for subtraction")
+   const op = "subtraction"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tint: return Value(dtype: tint, valInt: a.valInt - b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for subtraction")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `*`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for multiplication")
+   const op = "multiplication"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tint: return Value(dtype: tint, valInt: a.valInt + b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for multiplication")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `div`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for division")
+   const op = "division"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tint: return Value(dtype: tint, valInt: a.valInt - b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for division")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 
 func `==`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for equality")
+   const op = "equality"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool == b.valBool)
    of tint: return Value(dtype: tbool, valBool: a.valInt == b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for equality")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `!=`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for inequality")
+   const op = "inequality"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool != b.valBool)
    of tint: return Value(dtype: tbool, valBool: a.valInt != b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for inequality")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `>`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for greater than")
+   const op = "greater than"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool > b.valBool)
    of tint: return Value(dtype: tbool, valBool: a.valInt > b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for greater than")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `>=`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for greater equals")
+   const op = "greater equals"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool >= b.valBool)
    of tint: return Value(dtype: tbool, valBool: a.valInt >= b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for greater equals")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `<`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for less than")
+   const op = "less than"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool < b.valBool)
    of tint: return Value(dtype: tbool, valBool: a.valInt < b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for less than")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `<=`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for less equals")
+   const op = "less equals"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool <= b.valBool)
    of tint: return Value(dtype: tbool, valBool: a.valInt <= b.valInt)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for less equals")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 
 func `and`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for logical and")
+   const op = "logical and"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool and b.valBool)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for logical and")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `or`*(a, b: Value): Value =
-   if a.dtype != b.dtype:
-      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for logical or")
+   const op = "logical or"
+   checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool or b.valBool)
-   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for logical or")
+   else: raiseUnexpectedDtypeException(a.dtype, op)
