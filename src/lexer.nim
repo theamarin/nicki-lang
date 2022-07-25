@@ -1,39 +1,39 @@
-import strutils, tables
-import dtype
+import strutils, strformat, tables
+import dtype, diagnostics
 
 type
    TokenKind* = enum
-      tokenBad
-      tokenEof
+      tokenBad = "[BAD]"
+      tokenEof = "[EOF]"
 
-      tokenWhitespace
-      tokenNumber
-      tokenIdentifier
+      tokenWhitespace = "[whitespace]"
+      tokenNumber = "[number]"
+      tokenIdentifier = "[identifier]"
 
       # Keywords
-      tokenTrue
-      tokenFalse
+      tokenTrue = "true"
+      tokenFalse = "false"
 
       # Operators
-      tokenComma
-      tokenCaret
-      tokenEquals
-      tokenEqualsEquals
-      tokenGreater
-      tokenGreaterEquals
-      tokenLess
-      tokenLessEquals
-      tokenBang
-      tokenBangEquals
-      tokenPercent
-      tokenAmp
-      tokenAmpAmp
-      tokenPipe
-      tokenPipePipe
-      tokenPlus
-      tokenMinus
-      tokenStar
-      tokenSlash
+      tokenComma = ","
+      tokenCaret = "^"
+      tokenEquals = "="
+      tokenEqualsEquals = "=="
+      tokenGreater = ">"
+      tokenGreaterEquals = ">="
+      tokenLess = "<"
+      tokenLessEquals = "<="
+      tokenBang = "!"
+      tokenBangEquals = "!="
+      tokenPercent = "%"
+      tokenAmp = "&"
+      tokenAmpAmp = "&&"
+      tokenPipe = "|"
+      tokenPipePipe = "||"
+      tokenPlus = "+"
+      tokenMinus = "-"
+      tokenStar = "*"
+      tokenSlash = "/"
 
       # Parentheses
       tokenParanthesisOpen
@@ -43,21 +43,19 @@ type
       case kind*: TokenKind
       of tokenNumber: value*: Value
       else: discard
-      position: int
+      pos*: int
       text: string
 
 # func kind*(token: Token): TokenKind = token.kind
 func `$`*(token: Token): string =
-   result = $token.kind
+   result = fmt"{$token.kind} @ {$token.pos} ({escape(token.text)})"
 
 type
    Lexer* = ref object
       text: string
-      position: int
+      pos: int
       tokens: seq[Token]
-      diagnostics: seq[string]
-
-func getDiagnostics*(lexer: Lexer): seq[string] = lexer.diagnostics
+      diagnostics*: Diagnostics
 
 type
    KeywordMatch = tuple
@@ -75,53 +73,53 @@ const
 
 
 func current(l: Lexer): char =
-   if l.position >= l.text.len: return '\0'
-   return l.text[l.position]
+   if l.pos >= l.text.len: return '\0'
+   return l.text[l.pos]
 
 func next(l: var Lexer): int {.discardable.} =
-   result = l.position
-   l.position.inc
+   result = l.pos
+   l.pos.inc
 
 
 func peek(l: Lexer, n = 1): char =
-   let pos = l.position + n
+   let pos = l.pos + n
    if pos >= l.text.len: return '\0'
    return l.text[pos]
 
 
 func lexNumber(l: var Lexer): Token =
-   let start = l.position
+   let start = l.pos
    while l.current() in Digits: l.next
-   let text = l.text.substr(start, l.position - 1)
+   let text = l.text.substr(start, l.pos - 1)
    let valInt =
       try: parseInt(text)
       except ValueError:
-         l.diagnostics.add("Cannot parse number: " & escape(text))
+         l.diagnostics.report("Cannot parse number: " & escape(text), start)
          0
    let value = Value(dtype: tint, valInt: valInt)
-   return Token(kind: tokenNumber, position: l.position, text: text, value: value)
+   return Token(kind: tokenNumber, pos: start, text: text, value: value)
 
 func lexWhitespace(l: var Lexer): Token =
-   let start = l.position
+   let start = l.pos
    while l.current() in Whitespace: l.next
-   let text = l.text.substr(start, l.position - 1)
-   return Token(kind: tokenWhitespace, position: l.position, text: text)
+   let text = l.text.substr(start, l.pos - 1)
+   return Token(kind: tokenWhitespace, pos: start, text: text)
 
 func lexWord(l: var Lexer): Token =
-   let start = l.position
+   let start = l.pos
    while l.current() in Letters: l.next
-   let text = l.text.substr(start, l.position - 1)
+   let text = l.text.substr(start, l.pos - 1)
    let token = if text in keywords: keywords[text] else: tokenIdentifier
-   return Token(kind: token, position: l.position, text: text)
+   return Token(kind: token, pos: start, text: text)
 
 func newToken(l: Lexer, kind: TokenKind, text: string): Token =
-   result = Token(kind: kind, position: l.position, text: text)
-   l.position += text.len
+   result = Token(kind: kind, pos: l.pos, text: text)
+   l.pos += text.len
 
 func nextToken(l: var Lexer): Token =
-   if l.position >= l.text.len:
-      return Token(kind: tokenEof, position: l.position, text: "\0")
    case l.current()
+   of '\0':
+      return l.newToken(tokenEof, "\0")
    of Letters:
       return l.lexWord
    of Digits:
@@ -140,6 +138,10 @@ func nextToken(l: var Lexer): Token =
       return l.newToken(tokenParanthesisOpen, "(")
    of ')':
       return l.newToken(tokenParanthesisClose, ")")
+   of ',':
+      return l.newToken(tokenComma, ",")
+   of '^':
+      return l.newToken(tokenCaret, "^")
    of '&':
       if l.peek == '&': return l.newToken(tokenAmpAmp, "&&")
       else: return l.newToken(tokenAmp, "&")
@@ -159,9 +161,9 @@ func nextToken(l: var Lexer): Token =
       if l.peek == '=': return l.newToken(tokenBangEquals, "!=")
       else: return l.newToken(tokenBang, "!")
    else:
-      l.diagnostics.add("Error: Bad character input: " & escape($l.current()))
-      let text: string = $l.text[l.position]
-      return Token(kind: tokenBad, position: l.next, text: text)
+      l.diagnostics.report("Bad character input " & escape($l.current()), l.pos)
+      let text: string = $l.text[l.pos]
+      return Token(kind: tokenBad, pos: l.next, text: text)
 
 func lex*(text: string): Lexer =
    result = Lexer(text: text)

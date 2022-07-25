@@ -1,5 +1,7 @@
 import strutils
-import lexer, syntaxfacts
+import lexer, syntaxfacts, diagnostics
+
+{.experimental: "notnil".}
 
 type
    NodeKind* = enum
@@ -8,7 +10,8 @@ type
       nodeBinaryExpression = "binary expression"
       nodeParanthesisExpression = "paranthesis expression"
 
-   Node* = ref object
+   Node* = ref NodeObj not nil
+   NodeObj = object
       case kind*: NodeKind
       of nodeLiteral: literalToken*: Token
       of nodeUnaryExpression:
@@ -23,9 +26,9 @@ type
 
    Parser = ref object
       lexer: Lexer
-      position: int
+      pos: int
       root*: Node
-      diagnostics*: seq[string]
+      diagnostics*: Diagnostics
 
 
 func `$`*(node: Node): string =
@@ -48,19 +51,19 @@ func `$`*(node: Node): string =
       result &= indent($node.close, 3)
 
 func peek(parser: Parser, offset: int = 0): Token =
-   return parser.lexer.get(parser.position + offset)
+   return parser.lexer.get(parser.pos + offset)
 
 func current(parser: Parser): Token = parser.peek()
 
 func nextToken(parser: var Parser): Token =
    result = parser.current
-   parser.position.inc
+   parser.pos.inc
 
 func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
    if parser.current.kind == kind:
       return parser.nextToken
-   parser.diagnostics.add("Error: Unexpected token " & escape($parser.current.kind) &
-         ", expected " & escape($kind))
+   parser.diagnostics.report("Unexpected token " & escape($parser.current.kind) &
+         ", expected " & escape($kind), parser.current.pos)
    return Token()
 
 func parseExpression(parser: var Parser, parentPrecedence = 0): Node
@@ -74,6 +77,10 @@ func parsePrimaryExpression(parser: var Parser): Node =
    elif parser.current.kind in [tokenTrue, tokenFalse, tokenNumber]:
       let token = parser.nextToken
       return Node(kind: nodeLiteral, literalToken: token)
+   else:
+      parser.diagnostics.report("Unexpected token " & escape(
+            $parser.current.kind) & " for primary expression", parser.current.pos)
+      return Node()
 
 func parseExpression(parser: var Parser, parentPrecedence = 0): Node =
    let unaryOperatorPrecedence = getUnaryOperatorPrecedence(parser.current.kind)
@@ -96,9 +103,10 @@ func parseExpression(parser: var Parser, parentPrecedence = 0): Node =
 
 
 func parse*(text: string): Parser =
-   result = Parser()
+   result = Parser(root: Node())
    result.lexer = text.lex
-   result.diagnostics = result.lexer.getDiagnostics
+   for r in result.lexer.diagnostics:
+      result.diagnostics.add(r)
 
    let left = result.parseExpression
    result.matchToken(tokenEof)

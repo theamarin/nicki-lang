@@ -1,4 +1,5 @@
-import parser, binder, evaluator
+import strutils
+import parser, binder, evaluator, diagnostics
 
 
 var showTree = false
@@ -13,8 +14,8 @@ while true:
    var parser = line.parse()
    if showTree: echo $parser.root
    if parser.diagnostics.len > 0:
-      for d in parser.diagnostics:
-         writeLine(stdout, d)
+      for report in parser.diagnostics:
+         writeLine(stdout, " ".repeat(report.pos+2) & "^  " & report.msg)
       continue
 
    var binder = newBinder(parser.root)
