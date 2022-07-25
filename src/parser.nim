@@ -71,8 +71,8 @@ func parsePrimaryExpression(parser: var Parser): Node =
       let expression = parser.parseExpression
       let close = parser.matchToken(tokenParanthesisClose)
       return Node(kind: nodeParanthesisExpression, open: open, expression: expression, close: close)
-   else:
-      let token = parser.matchToken(tokenNumber)
+   elif parser.current.kind in [tokenTrue, tokenFalse, tokenNumber]:
+      let token = parser.nextToken
       return Node(kind: nodeLiteral, literalToken: token)
 
 func parseExpression(parser: var Parser, parentPrecedence = 0): Node =

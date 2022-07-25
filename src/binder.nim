@@ -22,7 +22,9 @@ type
       boundBinaryAddition,
       boundBinarySubtraction,
       boundBinaryMultiplication,
-      boundBinaryDivision
+      boundBinaryDivision,
+      boundBinaryLogicalAnd,
+      boundBinaryLogicalOr
 
    BoundBinaryOperatorMatch = tuple
       leftDtype: Dtype
@@ -69,6 +71,8 @@ const
    boundBinaryOperatorList: seq[BoundBinaryOperator] = @[
       ((tint, tokenPlus, tint), (boundBinaryaddition, tint)),
       ((tint, tokenMinus, tint), (boundBinarySubtraction, tint)),
+      ((tbool, tokenAmpAmp, tbool), (boundBinaryLogicalAnd, tbool)),
+      ((tbool, tokenPipePipe, tbool), (boundBinaryLogicalOr, tbool)),
    ]
    boundBinaryOperators: BoundBinaryOperators = boundBinaryOperatorList.toTable
 
@@ -97,8 +101,11 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeLiteral
    case node.literalToken.kind
    of tokenNumber:
-      let value = Value(dtype: tint, valInt: node.literalToken.valInt)
-      return Bound(kind: boundLiteralExpression, value: value, dtype: tint)
+      let value = node.literalToken.value
+      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
+   of tokenTrue, tokenFalse:
+      let value = Value(dtype: tbool, valBool: node.literalToken.kind == tokenTrue)
+      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literalToken.kind))
 

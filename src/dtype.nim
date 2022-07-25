@@ -54,3 +54,20 @@ func `div`*(a, b: Value): Value =
    case a.dtype
    of tint: return Value(dtype: tint, valInt: a.valInt - b.valInt)
    else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for division")
+
+
+func `and`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for division")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool and b.valBool)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for logical and")
+
+func `or`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for division")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool or b.valBool)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for logical or")

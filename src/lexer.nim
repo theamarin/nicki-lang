@@ -1,4 +1,5 @@
-import strutils
+import strutils, tables
+import dtype
 
 type
    TokenKind* = enum
@@ -7,6 +8,11 @@ type
 
       tokenWhitespace
       tokenNumber
+      tokenIdentifier
+
+      # Keywords
+      tokenTrue
+      tokenFalse
 
       # Operators
       tokenComma
@@ -31,7 +37,7 @@ type
 
    Token* = ref object
       case kind*: TokenKind
-      of tokenNumber: valInt*: int
+      of tokenNumber: value*: Value
       else: discard
       position: int
       text: string
@@ -48,6 +54,20 @@ type
       diagnostics: seq[string]
 
 func getDiagnostics*(lexer: Lexer): seq[string] = lexer.diagnostics
+
+type
+   KeywordMatch = tuple
+      keyword: string
+      token: TokenKind
+   KeywordList = seq[KeywordMatch]
+   Keywords = Table[string, TokenKind]
+
+const
+   keywordList: KeywordList = @[
+      ("true", tokenTrue),
+      ("false", tokenFalse),
+   ]
+   keywords: Keywords = keywordList.toTable
 
 
 func current(l: Lexer): char =
@@ -74,13 +94,21 @@ func lexNumber(l: var Lexer): Token =
       except ValueError:
          l.diagnostics.add("Cannot parse number: " & escape(text))
          0
-   return Token(kind: tokenNumber, position: l.position, text: text, valInt: valInt)
+   let value = Value(dtype: tint, valInt: valInt)
+   return Token(kind: tokenNumber, position: l.position, text: text, value: value)
 
 func lexWhitespace(l: var Lexer): Token =
    let start = l.position
    while l.current() in Whitespace: l.next
    let text = l.text.substr(start, l.position - 1)
    return Token(kind: tokenWhitespace, position: l.position, text: text)
+
+func lexWord(l: var Lexer): Token =
+   let start = l.position
+   while l.current() in Letters: l.next
+   let text = l.text.substr(start, l.position - 1)
+   let token = if text in keywords: keywords[text] else: tokenIdentifier
+   return Token(kind: token, position: l.position, text: text)
 
 func newToken(l: Lexer, kind: TokenKind, text: string): Token =
    result = Token(kind: kind, position: l.position, text: text)
@@ -90,6 +118,8 @@ func nextToken(l: var Lexer): Token =
    if l.position >= l.text.len:
       return Token(kind: tokenEof, position: l.position, text: "\0")
    case l.current()
+   of Letters:
+      return l.lexWord
    of Digits:
       return l.lexNumber
    of Whitespace:
