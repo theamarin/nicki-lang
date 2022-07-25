@@ -23,6 +23,12 @@ type
       boundBinarySubtraction,
       boundBinaryMultiplication,
       boundBinaryDivision,
+      boundBinaryEquals,
+      boundBinaryNotEquals,
+      boundBinaryGreaterThan,
+      boundBinaryGreaterEquals,
+      boundBinaryLessThan,
+      boundBinaryLessEquals,
       boundBinaryLogicalAnd,
       boundBinaryLogicalOr
 
@@ -71,6 +77,23 @@ const
    boundBinaryOperatorList: seq[BoundBinaryOperator] = @[
       ((tint, tokenPlus, tint), (boundBinaryaddition, tint)),
       ((tint, tokenMinus, tint), (boundBinarySubtraction, tint)),
+      ((tint, tokenStar, tint), (boundBinaryMultiplication, tint)),
+      ((tint, tokenSlash, tint), (boundBinaryDivision, tint)),
+
+      ((tbool, tokenEqualsEquals, tbool), (boundBinaryEquals, tbool)),
+      ((tbool, tokenBangEquals, tbool), (boundBinaryNotEquals, tbool)),
+      ((tbool, tokenGreater, tbool), (boundBinaryGreaterThan, tbool)),
+      ((tbool, tokenGreaterEquals, tbool), (boundBinaryGreaterEquals, tbool)),
+      ((tbool, tokenLess, tbool), (boundBinaryLessThan, tbool)),
+      ((tbool, tokenLessEquals, tbool), (boundBinaryLessEquals, tbool)),
+
+      ((tint, tokenEqualsEquals, tint), (boundBinaryEquals, tbool)),
+      ((tint, tokenBangEquals, tint), (boundBinaryNotEquals, tbool)),
+      ((tint, tokenGreater, tint), (boundBinaryGreaterThan, tbool)),
+      ((tint, tokenGreaterEquals, tint), (boundBinaryGreaterEquals, tbool)),
+      ((tint, tokenLess, tint), (boundBinaryLessThan, tbool)),
+      ((tint, tokenLessEquals, tint), (boundBinaryLessEquals, tbool)),
+
       ((tbool, tokenAmpAmp, tbool), (boundBinaryLogicalAnd, tbool)),
       ((tbool, tokenPipePipe, tbool), (boundBinaryLogicalOr, tbool)),
    ]

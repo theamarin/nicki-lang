@@ -19,6 +19,10 @@ type
       tokenCaret
       tokenEquals
       tokenEqualsEquals
+      tokenGreater
+      tokenGreaterEquals
+      tokenLess
+      tokenLessEquals
       tokenBang
       tokenBangEquals
       tokenPercent
@@ -142,6 +146,18 @@ func nextToken(l: var Lexer): Token =
    of '|':
       if l.peek == '|': return l.newToken(tokenPipePipe, "||")
       else: return l.newToken(tokenPipe, "|")
+   of '=':
+      if l.peek == '=': return l.newToken(tokenEqualsEquals, "==")
+      else: return l.newToken(tokenEquals, "=")
+   of '>':
+      if l.peek == '=': return l.newToken(tokenGreaterEquals, ">=")
+      else: return l.newToken(tokenGreater, ">")
+   of '<':
+      if l.peek == '=': return l.newToken(tokenLessEquals, "<=")
+      else: return l.newToken(tokenLess, "<")
+   of '!':
+      if l.peek == '=': return l.newToken(tokenBangEquals, "!=")
+      else: return l.newToken(tokenBang, "!")
    else:
       l.diagnostics.add("Error: Bad character input: " & escape($l.current()))
       let text: string = $l.text[l.position]

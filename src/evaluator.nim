@@ -16,5 +16,11 @@ func evaluate*(node: Bound): Value =
       of boundBinarySubtraction: return left - right
       of boundBinaryMultiplication: return left * right
       of boundBinaryDivision: return left div right
+      of boundBinaryEquals: return left == right
+      of boundBinaryNotEquals: return left != right
+      of boundBinaryGreaterThan: return left > right
+      of boundBinaryGreaterEquals: return left >= right
+      of boundBinaryLessThan: return left < right
+      of boundBinaryLessEquals: return left <= right
       of boundBinaryLogicalAnd: return left and right
       of boundBinaryLogicalOr: return left or right

@@ -56,10 +56,65 @@ func `div`*(a, b: Value): Value =
    else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for division")
 
 
+func `==`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for equality")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool == b.valBool)
+   of tint: return Value(dtype: tbool, valBool: a.valInt == b.valInt)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for equality")
+
+func `!=`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for inequality")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool != b.valBool)
+   of tint: return Value(dtype: tbool, valBool: a.valInt != b.valInt)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for inequality")
+
+func `>`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for greater than")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool > b.valBool)
+   of tint: return Value(dtype: tbool, valBool: a.valInt > b.valInt)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for greater than")
+
+func `>=`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for greater equals")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool >= b.valBool)
+   of tint: return Value(dtype: tbool, valBool: a.valInt >= b.valInt)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for greater equals")
+
+func `<`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for less than")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool < b.valBool)
+   of tint: return Value(dtype: tbool, valBool: a.valInt < b.valInt)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for less than")
+
+func `<=`*(a, b: Value): Value =
+   if a.dtype != b.dtype:
+      raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
+            $b.dtype) & " differ for less equals")
+   case a.dtype
+   of tbool: return Value(dtype: tbool, valBool: a.valBool <= b.valBool)
+   of tint: return Value(dtype: tbool, valBool: a.valInt <= b.valInt)
+   else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for less equals")
+
+
 func `and`*(a, b: Value): Value =
    if a.dtype != b.dtype:
       raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for division")
+            $b.dtype) & " differ for logical and")
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool and b.valBool)
    else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for logical and")
@@ -67,7 +122,7 @@ func `and`*(a, b: Value): Value =
 func `or`*(a, b: Value): Value =
    if a.dtype != b.dtype:
       raise newException(ValueError, "Dtypes " & escape($a.dtype) & " and " & escape(
-            $b.dtype) & " differ for division")
+            $b.dtype) & " differ for logical or")
    case a.dtype
    of tbool: return Value(dtype: tbool, valBool: a.valBool or b.valBool)
    else: raise newException(ValueError, "Unexpected dtype " & escape($a.dtype) & " for logical or")

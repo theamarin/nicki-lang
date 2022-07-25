@@ -15,7 +15,8 @@ func getBinaryOperatorPrecedence*(tokenKind: TokenKind): int =
    of tokenPipe: return 6 # Bitwise OR
    of tokenCaret: return 7 # Bitwise XOR
    of tokenAmp: return 8 # Bitwise AND
-   of tokenEqualsEquals, tokenBangEquals: return 9 # relational: equals
+   of tokenEqualsEquals, tokenBangEquals, tokenLess, tokenLessEquals, tokenGreater,
+         tokenGreaterEquals: return 9 # relational: equals
    # 10: relational: other
    # 11: Bitwise shift
    of tokenMinus, tokenPlus: return 12 # Addition and subtraction
