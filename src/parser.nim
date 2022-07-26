@@ -66,12 +66,15 @@ func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
          ", expected " & escape($kind), parser.current.pos)
    return Token()
 
-func parseExpression(parser: var Parser, parentPrecedence = 0): Node
+func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node
+func parsePrimaryExpression(parser: var Parser): Node
+
+func parseExpression(parser: var Parser): Node = parser.parseOperatorExpression
 
 func parsePrimaryExpression(parser: var Parser): Node =
    if parser.current.kind == tokenParanthesisOpen:
       let open = parser.nextToken
-      let expression = parser.parseExpression
+      let expression = parser.parseOperatorExpression
       let close = parser.matchToken(tokenParanthesisClose)
       return Node(kind: nodeParanthesisExpression, open: open, expression: expression, close: close)
    elif parser.current.kind in [tokenTrue, tokenFalse, tokenNumber]:
@@ -82,11 +85,11 @@ func parsePrimaryExpression(parser: var Parser): Node =
             $parser.current.kind) & " for primary expression", parser.current.pos)
       return Node()
 
-func parseExpression(parser: var Parser, parentPrecedence = 0): Node =
+func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
    let unaryOperatorPrecedence = getUnaryOperatorPrecedence(parser.current.kind)
    if unaryOperatorPrecedence != 0 and unaryOperatorPrecedence >= parentPrecedence:
       let operatorToken = parser.nextToken
-      let operand = parser.parseExpression(unaryOperatorPrecedence)
+      let operand = parser.parseOperatorExpression(unaryOperatorPrecedence)
       result = Node(kind: nodeUnaryExpression, unaryOperator: operatorToken,
             unaryOperand: operand)
    else:
@@ -97,7 +100,7 @@ func parseExpression(parser: var Parser, parentPrecedence = 0): Node =
       if precedence == 0 or precedence <= parentPrecedence:
          break
       let binaryOperator = parser.nextToken
-      let right = parser.parseExpression(precedence)
+      let right = parser.parseOperatorExpression(precedence)
       result = Node(kind: nodeBinaryExpression, left: result,
             binaryOperator: binaryOperator, right: right)
 
