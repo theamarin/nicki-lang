@@ -50,14 +50,14 @@ func `*`*(a, b: Value): Value =
    const op = "multiplication"
    checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
-   of tint: return Value(dtype: tint, valInt: a.valInt + b.valInt)
+   of tint: return Value(dtype: tint, valInt: a.valInt * b.valInt)
    else: raiseUnexpectedDtypeException(a.dtype, op)
 
 func `div`*(a, b: Value): Value =
    const op = "division"
    checkDtypesMatch(a.dtype, b.dtype, op)
    case a.dtype
-   of tint: return Value(dtype: tint, valInt: a.valInt - b.valInt)
+   of tint: return Value(dtype: tint, valInt: a.valInt div b.valInt)
    else: raiseUnexpectedDtypeException(a.dtype, op)
 
 
