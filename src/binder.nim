@@ -47,15 +47,19 @@ type
 
 
    BoundKind* = enum
-      boundLiteralExpression = "literal expression",
-      boundUnaryExpression = "unary expression",
-      boundBinaryExpression = "binary expression",
+      boundLiteralExpression = "literal expression"
+      boundIdentifierExpression = "identifier expression"
+      boundUnaryExpression = "unary expression"
+      boundBinaryExpression = "binary expression"
+      boundAssignmentExpression = "assignment expression"
 
    Bound* = ref object
       dtype*: Dtype
       case kind*: BoundKind
       of boundLiteralExpression:
          value*: Value
+      of boundIdentifierExpression:
+         identifier*: string
       of boundUnaryExpression:
          unaryOperator*: BoundUnaryOperatorKind
          unaryOperand*: Bound
@@ -63,10 +67,15 @@ type
          binaryOperator*: BoundBinaryOperatorKind
          binaryLeft*: Bound
          binaryRight*: Bound
+      of boundAssignmentExpression:
+         lvalue*: Token
+         assignment*: Token
+         rvalue*: Bound
 
    Binder* = ref object
       root*: Bound
       diagnostics*: Diagnostics
+      identifiers*: Table[string, Dtype]
 
 const
    boundUnaryOperatorList: seq[BoundUnaryOperator] = @[
@@ -122,20 +131,55 @@ func getBinaryOperator(binder: Binder, leftDtype: Dtype, token: Token,
             $token.kind) & " not defined for dtypes " & escape($leftDtype) & " and " &
             escape($rightDtype), token.pos)
 
-func bindExpression(binder: Binder, node: Node): Bound
+
+
+func `$`*(bound: Bound): string =
+   result = $bound.kind & ": "
+   case bound.kind
+   of boundLiteralExpression: result &= $bound.value
+   of boundIdentifierExpression: result &= $bound.identifier
+   of boundUnaryExpression:
+      result &= "\p"
+      result &= indent($bound.unaryOperator, 3) & "\p"
+      result &= indent($bound.unaryOperand, 3)
+   of boundBinaryExpression:
+      result &= "\p"
+      result &= indent($bound.binaryLeft, 3) & "\p"
+      result &= indent($bound.binaryOperator, 3) & "\p"
+      result &= indent($bound.binaryRight, 3)
+   of boundAssignmentExpression:
+      result &= "\p"
+      result &= indent($bound.lvalue, 3) & "\p"
+      result &= indent($bound.assignment, 3) & "\p"
+      result &= indent($bound.rvalue, 3)
+
+
+func bindExpression*(binder: Binder, node: Node): Bound
 
 func bindLiteralExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeLiteral
-   case node.literalToken.kind
+   case node.literal.kind
    of tokenNumber:
-      let value = node.literalToken.value
+      let value = node.literal.value
       return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
    of tokenTrue, tokenFalse:
-      let value = Value(dtype: tbool, valBool: node.literalToken.kind == tokenTrue)
+      let value = Value(dtype: tbool, valBool: node.literal.kind == tokenTrue)
       return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
-         $node.literalToken.kind))
+         $node.literal.kind))
 
+func bindIdentifierExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == nodeIdentifier
+   assert node.identifier.kind == tokenIdentifier
+   let identifier = node.identifier.text
+   var dtype: Dtype =
+      if identifier in binder.identifiers:
+         binder.identifiers[identifier]
+      else:
+         binder.diagnostics.report("Unknown identifier " & escape(identifier),
+               node.identifier.pos)
+         terror
+   return Bound(kind: boundIdentifierExpression, dtype: dtype, identifier: identifier)
 
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeUnaryExpression
@@ -153,17 +197,25 @@ func bindBinaryExpression(binder: Binder, node: Node): Bound =
    return Bound(kind: boundBinaryExpression, binaryLeft: boundLeft,
          binaryRight: boundRight, binaryOperator: operatorKind, dtype: resultDtype)
 
-func bindExpression(binder: Binder, node: Node): Bound =
+func bindAssignmentExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == nodeAssignmentExpression
+   assert node.lvalue.kind == tokenIdentifier
+   let rvalue = binder.bindExpression(node.rvalue)
+   binder.identifiers[node.lvalue.text] = rvalue.dtype
+   return Bound(kind: boundAssignmentExpression, lvalue: node.lvalue,
+         assignment: node.assignment, rvalue: rvalue)
+
+func bindExpression*(binder: Binder, node: Node): Bound =
    case node.kind
    of nodeLiteral:
       return binder.bindLiteralExpression(node)
+   of nodeIdentifier:
+      return binder.bindIdentifierExpression(node)
    of nodeUnaryExpression:
       return binder.bindUnaryExpression(node)
    of nodeBinaryExpression:
       return binder.bindBinaryExpression(node)
    of nodeParanthesisExpression:
       return binder.bindExpression(node.expression)
-
-func newBinder*(node: Node): Binder =
-   result = Binder()
-   result.root = result.bindExpression(node)
+   of nodeAssignmentExpression:
+      return binder.bindAssignmentExpression(node)

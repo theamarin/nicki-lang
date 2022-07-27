@@ -44,7 +44,7 @@ type
       of tokenNumber: value*: Value
       else: discard
       pos*: int
-      text: string
+      text*: string
 
 # func kind*(token: Token): TokenKind = token.kind
 func `$`*(token: Token): string =

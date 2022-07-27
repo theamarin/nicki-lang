@@ -1,16 +1,22 @@
+import tables
 import dtype, binder
 
-func evaluate*(node: Bound): Value =
+type
+   Evaluator* = ref object
+      variables*: Table[string, Value]
+
+func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
    of boundLiteralExpression: return node.value
+   of boundIdentifierExpression: return self.variables[node.identifier]
    of boundUnaryExpression:
       case node.unaryOperator
-      of boundUnaryPlus: return node.unaryOperand.evaluate
-      of boundUnaryMinus: return node.unaryOperand.evaluate.negative
-      of boundUnaryNot: return node.unaryOperand.evaluate.logicalNot
+      of boundUnaryPlus: return self.evaluate(node.unaryOperand)
+      of boundUnaryMinus: return self.evaluate(node.unaryOperand).negative
+      of boundUnaryNot: return self.evaluate(node.unaryOperand).logicalNot
    of boundBinaryExpression:
-      let left = node.binaryLeft.evaluate
-      let right = node.binaryRight.evaluate
+      let left = self.evaluate(node.binaryLeft)
+      let right = self.evaluate(node.binaryRight)
       case node.binaryOperator
       of boundBinaryAddition: return left + right
       of boundBinarySubtraction: return left - right
@@ -25,3 +31,8 @@ func evaluate*(node: Bound): Value =
       of boundBinaryLogicalAnd: return left and right
       of boundBinaryLogicalOr: return left or right
       of boundBinaryLogicalXor: return left xor right
+   of boundAssignmentExpression:
+      let rvalue = self.evaluate(node.rvalue)
+      let lvalue = node.lvalue
+      self.variables[lvalue.text] = rvalue
+      return rvalue

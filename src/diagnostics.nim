@@ -15,6 +15,8 @@ func add*(d: var Diagnostics, report: Report) =
 
 func len*(d: Diagnostics): int = d.reports.len
 
+func clear*(d: var Diagnostics) = d.reports = newSeq[Report]()
+
 iterator items*(d: Diagnostics): Report =
    for r in d.reports:
       yield r
