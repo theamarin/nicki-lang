@@ -7,13 +7,13 @@ var showBind = false
 var showVars = false
 
 var myEvaluator = Evaluator()
-var myBinder = Binder()
+var myBinder = newBinder()
 
 while true:
    if showVars:
       echo "Identifiers: "
-      for identifier, dtype in myBinder.identifiers:
-         echo " " & $identifier & ": " & $dtype
+      for name, identifier in myBinder.scope.identifiers:
+         echo " " & $name & ": " & $identifier.dtype
 
       echo "Variables: "
       for variable, value in myEvaluator.variables:

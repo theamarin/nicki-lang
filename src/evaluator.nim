@@ -8,7 +8,7 @@ type
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
    of boundLiteralExpression: return node.value
-   of boundIdentifierExpression: return self.variables[node.identifier]
+   of boundIdentifierExpression: return self.variables[node.identifier.name]
    of boundUnaryExpression:
       case node.unaryOperator
       of boundUnaryPlus: return self.evaluate(node.unaryOperand)

@@ -1,5 +1,24 @@
-import strutils, tables
+import strutils, strformat, tables
 import parser, lexer, dtype, diagnostics
+
+type
+   Identifier* = ref object
+      name*: string
+      dtype*: Dtype
+   BoundScope* = ref object
+      identifiers*: Table[string, Identifier]
+      parent*: BoundScope
+
+func tryDeclare*(self: BoundScope, identifier: Identifier): bool =
+   if identifier.name in self.identifiers: return false
+   self.identifiers[identifier.name] = identifier
+   return true
+
+func tryLookup*(self: BoundScope, name: string): Identifier =
+   if name in self.identifiers: return self.identifiers[name]
+   if self.parent != nil: return self.parent.tryLookup(name)
+   return nil
+
 
 type
    BoundUnaryOperatorKind* = enum
@@ -59,7 +78,7 @@ type
       of boundLiteralExpression:
          value*: Value
       of boundIdentifierExpression:
-         identifier*: string
+         identifier*: Identifier
       of boundUnaryExpression:
          unaryOperator*: BoundUnaryOperatorKind
          unaryOperand*: Bound
@@ -75,7 +94,7 @@ type
    Binder* = ref object
       root*: Bound
       diagnostics*: Diagnostics
-      identifiers*: Table[string, Dtype]
+      scope*: BoundScope
 
 const
    boundUnaryOperatorList: seq[BoundUnaryOperator] = @[
@@ -137,7 +156,8 @@ func `$`*(bound: Bound): string =
    result = $bound.kind & ": "
    case bound.kind
    of boundLiteralExpression: result &= $bound.value
-   of boundIdentifierExpression: result &= $bound.identifier
+   of boundIdentifierExpression:
+      result &= bound.identifier.name & " of " & $bound.identifier.dtype
    of boundUnaryExpression:
       result &= "\p"
       result &= indent($bound.unaryOperator, 3) & "\p"
@@ -171,14 +191,15 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
 func bindIdentifierExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeIdentifier
    assert node.identifier.kind == tokenIdentifier
-   let identifier = node.identifier.text
-   var dtype: Dtype =
-      if identifier in binder.identifiers:
-         binder.identifiers[identifier]
-      else:
-         binder.diagnostics.report("Unknown identifier " & escape(identifier),
-               node.identifier.pos)
-         terror
+   let name = node.identifier.text
+   let identifier = binder.scope.tryLookup(name)
+   var dtype: Dtype
+   if identifier == nil:
+      binder.diagnostics.report("Unknown identifier " & escape(name),
+            node.identifier.pos)
+      dtype = terror
+   else:
+      dtype = identifier.dtype
    return Bound(kind: boundIdentifierExpression, dtype: dtype, identifier: identifier)
 
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
@@ -201,7 +222,10 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeAssignmentExpression
    assert node.lvalue.kind == tokenIdentifier
    let rvalue = binder.bindExpression(node.rvalue)
-   binder.identifiers[node.lvalue.text] = rvalue.dtype
+   if not binder.scope.tryDeclare(Identifier(name: node.lvalue.text,
+         dtype: rvalue.dtype)):
+      binder.diagnostics.report(&"Identifier {escape(node.lvalue.text)} already declared",
+            node.lvalue.pos)
    return Bound(kind: boundAssignmentExpression, lvalue: node.lvalue,
          assignment: node.assignment, rvalue: rvalue)
 
@@ -219,3 +243,9 @@ func bindExpression*(binder: Binder, node: Node): Bound =
       return binder.bindExpression(node.expression)
    of nodeAssignmentExpression:
       return binder.bindAssignmentExpression(node)
+   of nodeCompilationUnit:
+      return
+
+func newBinder*(parent: BoundScope = nil): Binder =
+   result = Binder()
+   result.scope = BoundScope(parent: parent)

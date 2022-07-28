@@ -11,6 +11,7 @@ type
       nodeBinaryExpression = "binary expression"
       nodeParanthesisExpression = "paranthesis expression"
       nodeAssignmentExpression = "assignment expression"
+      nodeCompilationUnit = "compilation unit"
 
    Node* = ref NodeObj not nil
    NodeObj = object
@@ -29,6 +30,10 @@ type
       of nodeAssignmentExpression:
          lvalue*, assignment*: Token
          rvalue*: Node
+      of nodeCompilationUnit:
+         root*: Node
+         eofToken*: Token
+
 
    Parser = ref object
       lexer: Lexer
@@ -61,6 +66,10 @@ func `$`*(node: Node): string =
       result &= indent($node.lvalue, 3) & "\p"
       result &= indent($node.assignment, 3) & "\p"
       result &= indent($node.rvalue, 3)
+   of nodeCompilationUnit:
+      result &= "\p"
+      result &= indent($node.root, 3) & "\p"
+      result &= indent($node.eofToken, 3)
 
 func peek(parser: Parser, offset: int = 0): Token =
    return parser.lexer.get(parser.pos + offset)
