@@ -48,7 +48,8 @@ type
 
 # func kind*(token: Token): TokenKind = token.kind
 func `$`*(token: Token): string =
-   result = fmt"{$token.kind} @ {$token.pos} ({escape(token.text)})"
+   if token.isNil: return "nil"
+   return fmt"{$token.kind} @ {$token.pos} ({escape(token.text)})"
 
 type
    Lexer* = ref object
