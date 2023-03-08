@@ -28,6 +28,12 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       of boundBinaryGreaterEquals: return left >= right
       of boundBinaryLessThan: return left < right
       of boundBinaryLessEquals: return left <= right
+      of boundBinaryCompinedComparison:
+         let res: int =
+            if (left > right).valBool: 1
+            elif (left < right).valBool: -1
+            else: 0
+         return Value(dtype: tint, valInt: res)
       of boundBinaryLogicalAnd: return left and right
       of boundBinaryLogicalOr: return left or right
       of boundBinaryLogicalXor: return left xor right

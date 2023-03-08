@@ -48,6 +48,7 @@ type
       boundBinaryGreaterEquals,
       boundBinaryLessThan,
       boundBinaryLessEquals,
+      boundBinaryCompinedComparison,
       boundBinaryLogicalAnd,
       boundBinaryLogicalOr
       boundBinaryLogicalXor
@@ -123,10 +124,14 @@ const
       ((tint, tokenGreaterEquals, tint), (boundBinaryGreaterEquals, tbool)),
       ((tint, tokenLess, tint), (boundBinaryLessThan, tbool)),
       ((tint, tokenLessEquals, tint), (boundBinaryLessEquals, tbool)),
+      ((tint, tokenCombinedComparison, tint), (boundBinaryCompinedComparison, tint)),
 
       ((tbool, tokenAmpAmp, tbool), (boundBinaryLogicalAnd, tbool)),
+      ((tbool, tokenAnd, tbool), (boundBinaryLogicalAnd, tbool)),
       ((tbool, tokenPipePipe, tbool), (boundBinaryLogicalOr, tbool)),
+      ((tbool, tokenOr, tbool), (boundBinaryLogicalOr, tbool)),
       ((tbool, tokenCaret, tbool), (boundBinaryLogicalXor, tbool)),
+      ((tbool, tokenXor, tbool), (boundBinaryLogicalXor, tbool)),
    ]
    boundBinaryOperators: BoundBinaryOperators = boundBinaryOperatorList.toTable
 

@@ -10,9 +10,15 @@ type
       tokenNumber = "[number]"
       tokenIdentifier = "[identifier]"
 
-      # Keywords
+      # Keywords (need to be added to keyword list below)
       tokenTrue = "true"
       tokenFalse = "false"
+      tokenAnd = "and"
+      tokenOr = "or"
+      tokenXor = "xor"
+      tokenIf = "if"
+      tokenElif = "elif"
+      tokenElse = "else"
 
       # Operators
       tokenComma = ","
@@ -23,6 +29,7 @@ type
       tokenGreaterEquals = ">="
       tokenLess = "<"
       tokenLessEquals = "<="
+      tokenCombinedComparison = "<=>"
       tokenBang = "!"
       tokenBangEquals = "!="
       tokenPercent = "%"
@@ -36,8 +43,8 @@ type
       tokenSlash = "/"
 
       # Parentheses
-      tokenParanthesisOpen
-      tokenParanthesisClose
+      tokenParanthesisOpen = "("
+      tokenParanthesisClose = ")"
 
    Token* = ref object
       case kind*: TokenKind
@@ -46,7 +53,6 @@ type
       pos*: int
       text*: string
 
-# func kind*(token: Token): TokenKind = token.kind
 func `$`*(token: Token): string =
    if token.isNil: return "nil"
    return fmt"{$token.kind} @ {$token.pos} ({escape(token.text)})"
@@ -69,6 +75,12 @@ const
    keywordList: KeywordList = @[
       ("true", tokenTrue),
       ("false", tokenFalse),
+      ("and", tokenAnd),
+      ("or", tokenOr),
+      ("xor", tokenXor),
+      ("if", tokenIf),
+      ("elif", tokenElif),
+      ("else", tokenElse),
    ]
    keywords: Keywords = keywordList.toTable
 
@@ -113,9 +125,10 @@ func lexWord(l: var Lexer): Token =
    let token = if text in keywords: keywords[text] else: tokenIdentifier
    return Token(kind: token, pos: start, text: text)
 
-func newToken(l: Lexer, kind: TokenKind, text: string): Token =
-   result = Token(kind: kind, pos: l.pos, text: text)
-   l.pos += text.len
+func newToken(l: Lexer, kind: TokenKind, text = ""): Token =
+   let myText = if text.len > 0: text else: $kind
+   result = Token(kind: kind, pos: l.pos, text: myText)
+   l.pos += myText.len
 
 func nextToken(l: var Lexer): Token =
    case l.current()
@@ -128,39 +141,42 @@ func nextToken(l: var Lexer): Token =
    of Whitespace:
       return l.lexWhitespace
    of '+':
-      return l.newToken(tokenPlus, "+")
+      return l.newToken(tokenPlus)
    of '-':
-      return l.newToken(tokenMinus, "-")
+      return l.newToken(tokenMinus)
    of '*':
-      return l.newToken(tokenStar, "*")
+      return l.newToken(tokenStar)
    of '/':
-      return l.newToken(tokenSlash, "/")
+      return l.newToken(tokenSlash)
    of '(':
-      return l.newToken(tokenParanthesisOpen, "(")
+      return l.newToken(tokenParanthesisOpen)
    of ')':
-      return l.newToken(tokenParanthesisClose, ")")
+      return l.newToken(tokenParanthesisClose)
    of ',':
-      return l.newToken(tokenComma, ",")
+      return l.newToken(tokenComma)
    of '^':
-      return l.newToken(tokenCaret, "^")
+      return l.newToken(tokenCaret)
    of '&':
-      if l.peek == '&': return l.newToken(tokenAmpAmp, "&&")
-      else: return l.newToken(tokenAmp, "&")
+      if l.peek == '&': return l.newToken(tokenAmpAmp)
+      else: return l.newToken(tokenAmp)
    of '|':
-      if l.peek == '|': return l.newToken(tokenPipePipe, "||")
-      else: return l.newToken(tokenPipe, "|")
+      if l.peek == '|': return l.newToken(tokenPipePipe)
+      else: return l.newToken(tokenPipe)
    of '=':
-      if l.peek == '=': return l.newToken(tokenEqualsEquals, "==")
-      else: return l.newToken(tokenEquals, "=")
+      if l.peek == '=': return l.newToken(tokenEqualsEquals)
+      else: return l.newToken(tokenEquals)
    of '>':
-      if l.peek == '=': return l.newToken(tokenGreaterEquals, ">=")
-      else: return l.newToken(tokenGreater, ">")
+      if l.peek == '=': return l.newToken(tokenGreaterEquals)
+      else: return l.newToken(tokenGreater)
    of '<':
-      if l.peek == '=': return l.newToken(tokenLessEquals, "<=")
-      else: return l.newToken(tokenLess, "<")
+      if l.peek == '=':
+         if l.peek(2) == '>':
+            return l.newToken(tokenCombinedComparison)
+         return l.newToken(tokenLessEquals)
+      else: return l.newToken(tokenLess)
    of '!':
-      if l.peek == '=': return l.newToken(tokenBangEquals, "!=")
-      else: return l.newToken(tokenBang, "!")
+      if l.peek == '=': return l.newToken(tokenBangEquals)
+      else: return l.newToken(tokenBang)
    else:
       l.diagnostics.report("Bad character input " & escape($l.current()), l.pos)
       let text: string = $l.text[l.pos]
