@@ -67,6 +67,7 @@ type
 
 
    BoundKind* = enum
+      boundError = "error expression",
       boundLiteralExpression = "literal expression"
       boundIdentifierExpression = "identifier expression"
       boundUnaryExpression = "unary expression"
@@ -76,6 +77,8 @@ type
    Bound* = ref object
       dtype*: Dtype
       case kind*: BoundKind
+      of boundError:
+         errorToken*: Token
       of boundLiteralExpression:
          value*: Value
       of boundIdentifierExpression:
@@ -124,7 +127,8 @@ const
       ((tint, tokenGreaterEquals, tint), (boundBinaryGreaterEquals, tbool)),
       ((tint, tokenLess, tint), (boundBinaryLessThan, tbool)),
       ((tint, tokenLessEquals, tint), (boundBinaryLessEquals, tbool)),
-      ((tint, tokenCombinedComparison, tint), (boundBinaryCompinedComparison, tint)),
+      ((tint, tokenCombinedComparison, tint), (boundBinaryCompinedComparison,
+            tint)),
 
       ((tbool, tokenAmpAmp, tbool), (boundBinaryLogicalAnd, tbool)),
       ((tbool, tokenAnd, tbool), (boundBinaryLogicalAnd, tbool)),
@@ -160,6 +164,7 @@ func getBinaryOperator(binder: Binder, leftDtype: Dtype, token: Token,
 func `$`*(bound: Bound): string =
    result = $bound.kind & ": "
    case bound.kind
+   of bounderror: result &= $bound.errorToken
    of boundLiteralExpression: result &= $bound.value
    of boundIdentifierExpression:
       result &= bound.identifier.name & " of " & $bound.identifier.dtype
@@ -180,6 +185,10 @@ func `$`*(bound: Bound): string =
 
 
 func bindExpression*(binder: Binder, node: Node): Bound
+
+func bindErrorExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == nodeError
+   return Bound(kind: boundError, errorToken: node.errorToken)
 
 func bindLiteralExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeLiteral
@@ -236,6 +245,8 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
 
 func bindExpression*(binder: Binder, node: Node): Bound =
    case node.kind
+   of nodeError:
+      return binder.bindErrorExpression(node)
    of nodeLiteral:
       return binder.bindLiteralExpression(node)
    of nodeIdentifier:

@@ -13,6 +13,7 @@ func `$`*(val: Value): string =
 
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
+   of boundError: return Value(dtype: terror)
    of boundLiteralExpression: return node.value
    of boundIdentifierExpression: return self.variables[node.identifier.name]
    of boundUnaryExpression:

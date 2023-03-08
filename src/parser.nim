@@ -5,6 +5,7 @@ import lexer, syntaxfacts, diagnostics
 
 type
    NodeKind* = enum
+      nodeError = "error"
       nodeLiteral = "literal"
       nodeIdentifier = "identifier"
       nodeUnaryExpression = "unary expression"
@@ -16,6 +17,7 @@ type
    Node* = ref NodeObj not nil
    NodeObj = object
       case kind*: NodeKind
+      of nodeError: errorToken*: Token
       of nodeLiteral: literal*: Token
       of nodeIdentifier: identifier*: Token
       of nodeUnaryExpression:
@@ -45,6 +47,7 @@ type
 func `$`*(node: Node): string =
    result = $node.kind & ": "
    case node.kind
+   of nodeError: result &= $node.errorToken
    of nodeLiteral: result &= $node.literal
    of nodeIdentifier: result &= $node.identifier
    of nodeUnaryExpression:
