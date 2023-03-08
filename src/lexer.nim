@@ -19,8 +19,11 @@ type
       tokenIf = "if"
       tokenElif = "elif"
       tokenElse = "else"
+      tokenDef = "def"
+      tokenConst = "const"
 
       # Operators
+      tokenColon = ":"
       tokenComma = ","
       tokenCaret = "^"
       tokenEquals = "="
@@ -81,6 +84,8 @@ const
       ("if", tokenIf),
       ("elif", tokenElif),
       ("else", tokenElse),
+      ("def", tokenDef),
+      ("const", tokenConst),
    ]
    keywords: Keywords = keywordList.toTable
 
@@ -155,6 +160,8 @@ func nextToken(l: var Lexer): Token =
       return l.newToken(tokenParanthesisClose)
    of ',':
       return l.newToken(tokenComma)
+   of ':':
+      return l.newToken(tokenColon)
    of '^':
       return l.newToken(tokenCaret)
    of '&':

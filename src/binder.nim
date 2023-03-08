@@ -73,6 +73,7 @@ type
       boundUnaryExpression = "unary expression"
       boundBinaryExpression = "binary expression"
       boundAssignmentExpression = "assignment expression"
+      boundConditionalExpression = "conditional expression"
 
    Bound* = ref object
       dtype*: Dtype
@@ -94,6 +95,12 @@ type
          lvalue*: Token
          assignment*: Token
          rvalue*: Bound
+      of boundConditionalExpression:
+         conditionToken*: Token
+         condition*: Bound # nil for "else"
+         colonToken*: Token
+         conditional*: Bound
+         otherwise*: Bound # if "elif" or "else" is present
 
    Binder* = ref object
       root*: Bound
@@ -155,9 +162,9 @@ func getBinaryOperator(binder: Binder, leftDtype: Dtype, token: Token,
       return boundBinaryOperators[(leftDtype, token.kind, rightDtype)]
    elif terror in [leftDtype, rightDtype]: discard
    else:
-      binder.diagnostics.report("Binary operator " & escape(
-            $token.kind) & " not defined for dtypes " & escape($leftDtype) & " and " &
-            escape($rightDtype), token.pos)
+      binder.diagnostics.report("Binary operator " & escape($token.kind) &
+         " not defined for dtypes " & escape($leftDtype) & " and " &
+         escape($rightDtype), token.pos)
 
 
 
@@ -182,6 +189,14 @@ func `$`*(bound: Bound): string =
       result &= indent($bound.lvalue, 3) & "\p"
       result &= indent($bound.assignment, 3) & "\p"
       result &= indent($bound.rvalue, 3)
+   of boundConditionalExpression:
+      result &= "\p"
+      result &= indent($bound.conditionToken, 3) & "\p"
+      if bound.condition != nil:
+         result &= indent($bound.condition, 3) & "\p"
+      result &= indent($bound.conditional, 3) & "\p"
+      if bound.otherwise != nil:
+         result &= indent($bound.otherwise, 3) & "\p"
 
 
 func bindExpression*(binder: Binder, node: Node): Bound
@@ -195,10 +210,12 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
    case node.literal.kind
    of tokenNumber:
       let value = node.literal.value
-      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
+      return Bound(kind: boundLiteralExpression, value: value,
+            dtype: value.dtype)
    of tokenTrue, tokenFalse:
       let value = Value(dtype: tbool, valBool: node.literal.kind == tokenTrue)
-      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
+      return Bound(kind: boundLiteralExpression, value: value,
+            dtype: value.dtype)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literal.kind))
 
@@ -214,7 +231,8 @@ func bindIdentifierExpression(binder: Binder, node: Node): Bound =
       dtype = terror
    else:
       dtype = identifier.dtype
-   return Bound(kind: boundIdentifierExpression, dtype: dtype, identifier: identifier)
+   return Bound(kind: boundIdentifierExpression, dtype: dtype,
+         identifier: identifier)
 
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeUnaryExpression
@@ -230,7 +248,8 @@ func bindBinaryExpression(binder: Binder, node: Node): Bound =
    let (operatorKind, resultDtype) = binder.getBinaryOperator(boundLeft.dtype,
          node.binaryOperator, boundRight.dtype)
    return Bound(kind: boundBinaryExpression, binaryLeft: boundLeft,
-         binaryRight: boundRight, binaryOperator: operatorKind, dtype: resultDtype)
+         binaryRight: boundRight, binaryOperator: operatorKind,
+         dtype: resultDtype)
 
 func bindAssignmentExpression(binder: Binder, node: Node): Bound =
    assert node.kind == nodeAssignmentExpression
@@ -242,6 +261,25 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
             node.lvalue.pos)
    return Bound(kind: boundAssignmentExpression, lvalue: node.lvalue,
          assignment: node.assignment, rvalue: rvalue)
+
+func bindConditionalExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == nodeConditionalExpression
+   let condition =
+      if node.condition != nil:
+         binder.bindExpression(node.condition)
+      else: nil
+   if condition != nil and condition.dtype != tbool:
+      binder.diagnostics.report(&"Condition is not boolean",
+            node.conditionToken.pos)
+   let conditional = binder.bindExpression(node.conditional)
+   let otherwise =
+      if node.otherwise != nil: binder.bindConditionalExpression(node.otherwise)
+      else: nil
+   return Bound(kind: boundConditionalExpression,
+         conditionToken: node.conditionToken, condition: condition,
+         colonToken: node.colonToken, conditional: conditional,
+         otherwise: otherwise)
+
 
 func bindExpression*(binder: Binder, node: Node): Bound =
    case node.kind
@@ -259,6 +297,8 @@ func bindExpression*(binder: Binder, node: Node): Bound =
       return binder.bindExpression(node.expression)
    of nodeAssignmentExpression:
       return binder.bindAssignmentExpression(node)
+   of nodeConditionalExpression:
+      return binder.bindConditionalExpression(node)
    of nodeCompilationUnit:
       return
 

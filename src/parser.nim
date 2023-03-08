@@ -5,17 +5,17 @@ import lexer, syntaxfacts, diagnostics
 
 type
    NodeKind* = enum
-      nodeError = "error"
-      nodeLiteral = "literal"
-      nodeIdentifier = "identifier"
+      nodeError = "error expression"
+      nodeLiteral = "literal expression"
+      nodeIdentifier = "identifier expression"
       nodeUnaryExpression = "unary expression"
       nodeBinaryExpression = "binary expression"
       nodeParanthesisExpression = "paranthesis expression"
       nodeAssignmentExpression = "assignment expression"
-      nodeCompilationUnit = "compilation unit"
+      nodeConditionalExpression = "conditional expression"
+      nodeCompilationUnit = "compilation unit expression"
 
-   Node* = ref NodeObj not nil
-   NodeObj = object
+   Node* = ref object
       case kind*: NodeKind
       of nodeError: errorToken*: Token
       of nodeLiteral: literal*: Token
@@ -32,6 +32,12 @@ type
       of nodeAssignmentExpression:
          lvalue*, assignment*: Token
          rvalue*: Node
+      of nodeConditionalExpression:
+         conditionToken*: Token
+         condition*: Node # nil for "else"
+         colonToken*: Token
+         conditional*: Node
+         otherwise*: Node # if "elif" or "else" is present
       of nodeCompilationUnit:
          root*: Node
          eofToken*: Token
@@ -69,6 +75,14 @@ func `$`*(node: Node): string =
       result &= indent($node.lvalue, 3) & "\p"
       result &= indent($node.assignment, 3) & "\p"
       result &= indent($node.rvalue, 3)
+   of nodeConditionalExpression:
+      result &= "\p"
+      result &= indent($node.conditionToken, 3) & "\p"
+      if node.condition != nil:
+         result &= indent($node.condition, 3) & "\p"
+      result &= indent($node.conditional, 3) & "\p"
+      if node.otherwise != nil:
+         result &= indent($node.otherwise, 3) & "\p"
    of nodeCompilationUnit:
       result &= "\p"
       result &= indent($node.root, 3) & "\p"
@@ -87,14 +101,42 @@ func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
    if parser.current.kind == kind:
       return parser.nextToken
    parser.diagnostics.report("Parser: Unexpected token " & escape(
-         $parser.current.kind) & ", expected " & escape($kind), parser.current.pos)
+         $parser.current.kind) & ", expected " & escape($kind),
+               parser.current.pos)
    return Token()
+
+func matchToken(parser: var Parser, kinds: set[TokenKind]): Token =
+   if parser.current.kind in kinds:
+      return parser.nextToken
+   parser.diagnostics.report("Parser: Unexpected token " & escape(
+         $parser.current.kind) & ", expected " & escape($kinds),
+               parser.current.pos)
+   return Token()
+
 
 func parseAssignmentExpression(parser: var Parser): Node
 func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node
 func parsePrimaryExpression(parser: var Parser): Node
 
 func parseExpression(parser: var Parser): Node = parser.parseAssignmentExpression
+
+func parseConditionalExpression(parser: var Parser): Node =
+   let conditionToken = parser.matchToken({tokenIf, tokenElif, tokenElse})
+   let condition =
+      if conditionToken.kind in [tokenIf, tokenElif]:
+         parser.parsePrimaryExpression
+      else: nil
+   let colonToken = parser.matchToken(tokenColon)
+   let conditional = parser.parsePrimaryExpression
+   let otherwise: Node =
+      if parser.peek.kind in [tokenElif, tokenElse]:
+         parser.parseConditionalExpression
+      else: nil
+
+   return Node(kind: nodeConditionalExpression, conditionToken: conditionToken,
+         condition: condition, colonToken: colonToken, conditional: conditional,
+         otherwise: otherwise)
+
 
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:
@@ -110,16 +152,20 @@ func parsePrimaryExpression(parser: var Parser): Node =
       let open = parser.nextToken
       let expression = parser.parseOperatorExpression
       let close = parser.matchToken(tokenParanthesisClose)
-      return Node(kind: nodeParanthesisExpression, open: open, expression: expression, close: close)
+      return Node(kind: nodeParanthesisExpression, open: open,
+            expression: expression, close: close)
    elif parser.current.kind in [tokenTrue, tokenFalse, tokenNumber]:
       let token = parser.nextToken
       return Node(kind: nodeLiteral, literal: token)
    elif parser.current.kind == tokenIdentifier:
       let token = parser.nextToken
       return Node(kind: nodeIdentifier, identifier: token)
+   elif parser.current.kind == tokenIf:
+      return parser.parseConditionalExpression
    else:
       parser.diagnostics.report("Parser: Unexpected token " & escape(
-            $parser.current.kind) & " for primary expression", parser.current.pos)
+            $parser.current.kind) & " for primary expression",
+            parser.current.pos)
       return Node()
 
 func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
