@@ -9,6 +9,8 @@ var showVars = false
 var myEvaluator = Evaluator()
 var myBinder = newBinder()
 
+const prompt = "> "
+
 while true:
    if showVars:
       echo "Identifiers: "
@@ -19,7 +21,7 @@ while true:
       for variable, value in myEvaluator.variables:
          echo " " & $variable & ": " & $value
 
-   write(stdout, "> ")
+   write(stdout, prompt)
    var line: string
    discard readLine(stdin, line)
    case line
@@ -31,7 +33,7 @@ while true:
    if showTree: echo $parser.root
    if parser.diagnostics.len > 0:
       for report in parser.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos+2) & "^  " & report.msg)
+         writeLine(stdout, " ".repeat(report.pos+prompt.len) & "^  " & report.msg)
       parser.diagnostics.clear
       continue
 
@@ -39,7 +41,7 @@ while true:
    if showBind: echo $bound
    if myBinder.diagnostics.len > 0:
       for report in myBinder.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos+2) & "^  " & report.msg)
+         writeLine(stdout, " ".repeat(report.pos+prompt.len) & "^  " & report.msg)
       myBinder.diagnostics.clear
       continue
 
