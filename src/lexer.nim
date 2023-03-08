@@ -120,7 +120,8 @@ func lexWhitespace(l: var Lexer): Token =
 
 func lexWord(l: var Lexer): Token =
    let start = l.pos
-   while l.current() in Letters: l.next
+   doAssert l.current() in IdentStartChars
+   while l.current() in IdentChars: l.next
    let text = l.text.substr(start, l.pos - 1)
    let token = if text in keywords: keywords[text] else: tokenIdentifier
    return Token(kind: token, pos: start, text: text)
