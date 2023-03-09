@@ -124,10 +124,10 @@ func parseConditionalExpression(parser: var Parser): Node =
    let conditionToken = parser.matchToken({tokenIf, tokenElif, tokenElse})
    let condition =
       if conditionToken.kind in [tokenIf, tokenElif]:
-         parser.parsePrimaryExpression
+         parser.parseExpression
       else: nil
    let colonToken = parser.matchToken(tokenColon)
-   let conditional = parser.parsePrimaryExpression
+   let conditional = parser.parseExpression
    let otherwise: Node =
       if parser.peek.kind in [tokenElif, tokenElse]:
          parser.parseConditionalExpression
