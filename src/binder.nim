@@ -268,8 +268,8 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
          dtype: rvalue.dtype)):
       binder.diagnostics.report(&"Identifier {escape(node.lvalue.text)} already declared",
             node.lvalue.pos)
-   return Bound(kind: boundAssignmentExpression, lvalue: node.lvalue,
-         assignment: node.assignment, rvalue: rvalue)
+   return Bound(kind: boundAssignmentExpression, dtype: rvalue.dtype,
+         lvalue: node.lvalue, assignment: node.assignment, rvalue: rvalue)
 
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
    assert node.kind == conditionalExpression
@@ -294,8 +294,9 @@ func bindBlockExpression(binder: Binder, node: Node): Bound =
    var blockExpressions: seq[Bound]
    for expression in node.blockExpressions:
       blockExpressions.add(binder.bindExpression(expression))
-   return Bound(kind: boundBlockExpression, blockStart: node.blockStart,
-         blockExpressions: blockExpressions, blockEnd: node.blockEnd)
+   return Bound(kind: boundBlockExpression, dtype: tvoid,
+         blockStart: node.blockStart, blockExpressions: blockExpressions,
+         blockEnd: node.blockEnd)
 
 
 func bindExpression*(binder: Binder, node: Node): Bound =
