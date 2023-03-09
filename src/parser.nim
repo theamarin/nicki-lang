@@ -62,40 +62,33 @@ func `$`*(node: Node): string =
    of literalExpression: result &= $node.literal
    of identifierExpression: result &= $node.identifier
    of unaryExpression:
-      result &= "\p"
-      result &= indent($node.unaryOperator, 3) & "\p"
-      result &= indent($node.unaryOperand, 3)
+      result &= "\p" & indent($node.unaryOperator, 3)
+      result &= "\p" & indent($node.unaryOperand, 3)
    of binaryExpression:
-      result &= "\p"
-      result &= indent($node.left, 3) & "\p"
-      result &= indent($node.binaryOperator, 3) & "\p"
-      result &= indent($node.right, 3)
+      result &= "\p" & indent($node.left, 3)
+      result &= "\p" & indent($node.binaryOperator, 3)
+      result &= "\p" & indent($node.right, 3)
    of paranthesisExpression:
-      result &= "\p"
-      result &= indent($node.open, 3) & "\p"
-      result &= indent($node.expression, 3) & "\p"
-      result &= indent($node.close, 3)
+      result &= "\p" & indent($node.open, 3)
+      result &= "\p" & indent($node.expression, 3)
+      result &= "\p" & indent($node.close, 3)
    of assignmentExpression:
-      result &= "\p"
-      result &= indent($node.lvalue, 3) & "\p"
-      result &= indent($node.assignment, 3) & "\p"
-      result &= indent($node.rvalue, 3)
+      result &= "\p" & indent($node.lvalue, 3)
+      result &= "\p" & indent($node.assignment, 3)
+      result &= "\p" & indent($node.rvalue, 3)
    of conditionalExpression:
-      result &= "\p"
-      result &= indent($node.conditionToken, 3) & "\p"
+      result &= "\p" & indent($node.conditionToken, 3)
       if node.condition != nil:
-         result &= indent($node.condition, 3) & "\p"
-      result &= indent($node.conditional, 3) & "\p"
+         result &= "\p" & indent($node.condition, 3)
+      result &= "\p" & indent($node.conditional, 3)
       if node.otherwise != nil:
-         result &= indent($node.otherwise, 3) & "\p"
+         result &= "\p" & indent($node.otherwise, 3)
    of blockExpression:
-      result &= "\p"
       for expression in node.blockExpressions:
-         result &= indent($expression, 3) & "\p"
+         result &= "\p" & indent($expression, 3)
    of compilationUnit:
-      result &= "\p"
-      result &= indent($node.root, 3) & "\p"
-      result &= indent($node.eofToken, 3)
+      result &= "\p" & indent($node.root, 3)
+      result &= "\p" & indent($node.eofToken, 3)
 
 func peek(parser: Parser, offset: int = 0): Token =
    return parser.lexer.get(parser.pos + offset)

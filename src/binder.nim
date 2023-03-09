@@ -181,31 +181,26 @@ func `$`*(bound: Bound): string =
    of boundIdentifierExpression:
       result &= bound.identifier.name & " of " & $bound.identifier.dtype
    of boundUnaryExpression:
-      result &= "\p"
-      result &= indent($bound.unaryOperator, 3) & "\p"
-      result &= indent($bound.unaryOperand, 3)
+      result &= "\p" & indent($bound.unaryOperator, 3)
+      result &= "\p" & indent($bound.unaryOperand, 3)
    of boundBinaryExpression:
-      result &= "\p"
-      result &= indent($bound.binaryLeft, 3) & "\p"
-      result &= indent($bound.binaryOperator, 3) & "\p"
-      result &= indent($bound.binaryRight, 3)
+      result &= "\p" & indent($bound.binaryLeft, 3)
+      result &= "\p" & indent($bound.binaryOperator, 3)
+      result &= "\p" & indent($bound.binaryRight, 3)
    of boundAssignmentExpression:
-      result &= "\p"
-      result &= indent($bound.lvalue, 3) & "\p"
-      result &= indent($bound.assignment, 3) & "\p"
-      result &= indent($bound.rvalue, 3)
+      result &= "\p" & indent($bound.lvalue, 3)
+      result &= "\p" & indent($bound.assignment, 3)
+      result &= "\p" & indent($bound.rvalue, 3)
    of boundConditionalExpression:
-      result &= "\p"
-      result &= indent($bound.conditionToken, 3) & "\p"
+      result &= "\p" & indent($bound.conditionToken, 3)
       if bound.condition != nil:
-         result &= indent($bound.condition, 3) & "\p"
-      result &= indent($bound.conditional, 3) & "\p"
+         result &= "\p" & indent($bound.condition, 3)
+      result &= "\p" & indent($bound.conditional, 3)
       if bound.otherwise != nil:
-         result &= indent($bound.otherwise, 3) & "\p"
+         result &= "\p" & indent($bound.otherwise, 3)
    of boundBlockExpression:
-      result &= "\p"
       for expression in bound.blockExpressions:
-         result &= indent($expression, 3) & "\p"
+         result &= "\p" & indent($expression, 3)
 
 
 func bindExpression*(binder: Binder, node: Node): Bound
