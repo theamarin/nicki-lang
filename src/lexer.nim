@@ -48,6 +48,8 @@ type
       # Parentheses
       tokenParanthesisOpen = "("
       tokenParanthesisClose = ")"
+      tokenBraceOpen = "{"
+      tokenBraceClose = "}"
 
    Token* = ref object
       case kind*: TokenKind
@@ -154,10 +156,6 @@ func nextToken(l: var Lexer): Token =
       return l.newToken(tokenStar)
    of '/':
       return l.newToken(tokenSlash)
-   of '(':
-      return l.newToken(tokenParanthesisOpen)
-   of ')':
-      return l.newToken(tokenParanthesisClose)
    of ',':
       return l.newToken(tokenComma)
    of ':':
@@ -173,6 +171,9 @@ func nextToken(l: var Lexer): Token =
    of '=':
       if l.peek == '=': return l.newToken(tokenEqualsEquals)
       else: return l.newToken(tokenEquals)
+   of '!':
+      if l.peek == '=': return l.newToken(tokenBangEquals)
+      else: return l.newToken(tokenBang)
    of '>':
       if l.peek == '=': return l.newToken(tokenGreaterEquals)
       else: return l.newToken(tokenGreater)
@@ -182,9 +183,14 @@ func nextToken(l: var Lexer): Token =
             return l.newToken(tokenCombinedComparison)
          return l.newToken(tokenLessEquals)
       else: return l.newToken(tokenLess)
-   of '!':
-      if l.peek == '=': return l.newToken(tokenBangEquals)
-      else: return l.newToken(tokenBang)
+   of '(':
+      return l.newToken(tokenParanthesisOpen)
+   of ')':
+      return l.newToken(tokenParanthesisClose)
+   of '{':
+      return l.newToken(tokenBraceOpen)
+   of '}':
+      return l.newToken(tokenBraceClose)
    else:
       l.diagnostics.report("Bad character input " & escape($l.current()), l.pos)
       let text: string = $l.text[l.pos]

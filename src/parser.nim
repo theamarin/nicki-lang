@@ -13,6 +13,7 @@ type
       paranthesisExpression = "paranthesis expression"
       assignmentExpression = "assignment expression"
       conditionalExpression = "conditional expression"
+      blockExpression = "block expression"
       compilationUnit = "compilation unit"
 
    Node* = ref object
@@ -38,6 +39,10 @@ type
          colonToken*: Token
          conditional*: Node
          otherwise*: Node # if "elif" or "else" is present
+      of blockExpression:
+         blockStart*: Token
+         blockExpressions*: seq[Node]
+         blockEnd*: Token
       of compilationUnit:
          root*: Node
          eofToken*: Token
@@ -83,6 +88,10 @@ func `$`*(node: Node): string =
       result &= indent($node.conditional, 3) & "\p"
       if node.otherwise != nil:
          result &= indent($node.otherwise, 3) & "\p"
+   of blockExpression:
+      result &= "\p"
+      for expression in node.blockExpressions:
+         result &= indent($expression, 3) & "\p"
    of compilationUnit:
       result &= "\p"
       result &= indent($node.root, 3) & "\p"
@@ -137,6 +146,16 @@ func parseConditionalExpression(parser: var Parser): Node =
          condition: condition, colonToken: colonToken, conditional: conditional,
          otherwise: otherwise)
 
+func parseBlockExpression(parser: var Parser): Node =
+   let blockStart = parser.matchToken(tokenBraceOpen)
+   var blockExpressions: seq[Node]
+   while parser.current.kind != tokenBraceClose:
+      blockExpressions.add(parser.parseExpression())
+   let blockEnd = parser.matchToken(tokenBraceClose)
+
+   return Node(kind: blockExpression, blockStart: blockStart,
+         blockExpressions: blockExpressions, blockEnd: blockEnd)
+
 
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:
@@ -162,6 +181,8 @@ func parsePrimaryExpression(parser: var Parser): Node =
       return Node(kind: identifierExpression, identifier: token)
    elif parser.current.kind == tokenIf:
       return parser.parseConditionalExpression
+   elif parser.current.kind == tokenBraceOpen:
+      return parser.parseBlockExpression
    else:
       parser.diagnostics.report("Parser: Unexpected token " & escape(
             $parser.current.kind) & " for primary expression",

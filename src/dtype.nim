@@ -3,12 +3,14 @@ import strutils
 type
    Dtype* = enum
       terror
+      tvoid
       tbool
       tint
 
    Value* = object
       case dtype*: Dtype
       of terror: discard
+      of tvoid: discard
       of tbool: valBool*: bool
       of tint: valInt*: int
 

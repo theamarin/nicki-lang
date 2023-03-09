@@ -7,9 +7,10 @@ type
 
 func `$`*(val: Value): string =
    case val.dtype
-   of tint: return $val.valInt
-   of tbool: return $val.valBool
    of terror: return "[error]"
+   of tvoid: return "[void]"
+   of tbool: return $val.valBool
+   of tint: return $val.valInt
 
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
@@ -55,3 +56,7 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       elif node.otherwise != nil:
          return self.evaluate(node.otherwise)
       else: return Value(dtype: terror)
+   of boundBlockExpression:
+      for expression in node.blockExpressions:
+         discard self.evaluate(expression)
+      return Value(dtype: tvoid)

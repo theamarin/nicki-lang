@@ -74,6 +74,7 @@ type
       boundBinaryExpression = "binary expression"
       boundAssignmentExpression = "assignment expression"
       boundConditionalExpression = "conditional expression"
+      boundBlockExpression = "block expression"
 
    Bound* = ref object
       dtype*: Dtype
@@ -101,6 +102,10 @@ type
          colonToken*: Token
          conditional*: Bound
          otherwise*: Bound # if "elif" or "else" is present
+      of boundBlockExpression:
+         blockStart*: Token
+         blockExpressions*: seq[Bound]
+         blockEnd*: Token
 
    Binder* = ref object
       root*: Bound
@@ -197,6 +202,10 @@ func `$`*(bound: Bound): string =
       result &= indent($bound.conditional, 3) & "\p"
       if bound.otherwise != nil:
          result &= indent($bound.otherwise, 3) & "\p"
+   of boundBlockExpression:
+      result &= "\p"
+      for expression in bound.blockExpressions:
+         result &= indent($expression, 3) & "\p"
 
 
 func bindExpression*(binder: Binder, node: Node): Bound
@@ -280,6 +289,14 @@ func bindConditionalExpression(binder: Binder, node: Node): Bound =
          colonToken: node.colonToken, conditional: conditional,
          otherwise: otherwise)
 
+func bindBlockExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == blockExpression
+   var blockExpressions: seq[Bound]
+   for expression in node.blockExpressions:
+      blockExpressions.add(binder.bindExpression(expression))
+   return Bound(kind: boundBlockExpression, blockStart: node.blockStart,
+         blockExpressions: blockExpressions, blockEnd: node.blockEnd)
+
 
 func bindExpression*(binder: Binder, node: Node): Bound =
    case node.kind
@@ -299,6 +316,8 @@ func bindExpression*(binder: Binder, node: Node): Bound =
       return binder.bindAssignmentExpression(node)
    of conditionalExpression:
       return binder.bindConditionalExpression(node)
+   of blockExpression:
+      return binder.bindBlockExpression(node)
    of compilationUnit:
       return
 
