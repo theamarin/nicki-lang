@@ -142,7 +142,7 @@ func parseConditionalExpression(parser: var Parser): Node =
 func parseBlockExpression(parser: var Parser): Node =
    let blockStart = parser.matchToken(tokenBraceOpen)
    var blockExpressions: seq[Node]
-   while parser.current.kind != tokenBraceClose:
+   while parser.current.kind notin {tokenBraceClose, tokenEof}:
       blockExpressions.add(parser.parseExpression())
    let blockEnd = parser.matchToken(tokenBraceClose)
 
