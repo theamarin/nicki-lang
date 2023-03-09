@@ -202,11 +202,11 @@ func `$`*(bound: Bound): string =
 func bindExpression*(binder: Binder, node: Node): Bound
 
 func bindErrorExpression(binder: Binder, node: Node): Bound =
-   assert node.kind == nodeError
+   assert node.kind == errorExpression
    return Bound(kind: boundError, errorToken: node.errorToken)
 
 func bindLiteralExpression(binder: Binder, node: Node): Bound =
-   assert node.kind == nodeLiteral
+   assert node.kind == literalExpression
    case node.literal.kind
    of tokenNumber:
       let value = node.literal.value
@@ -220,7 +220,7 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
          $node.literal.kind))
 
 func bindIdentifierExpression(binder: Binder, node: Node): Bound =
-   assert node.kind == nodeIdentifier
+   assert node.kind == identifierExpression
    assert node.identifier.kind == tokenIdentifier
    let name = node.identifier.text
    let identifier = binder.scope.tryLookup(name)
@@ -235,14 +235,14 @@ func bindIdentifierExpression(binder: Binder, node: Node): Bound =
          identifier: identifier)
 
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
-   assert node.kind == nodeUnaryExpression
+   assert node.kind == unaryExpression
    let operand = binder.bindExpression(node.unaryOperand)
    let (operatorKind, resultDtype) = binder.getUnaryOperator(node.unaryOperator, operand.dtype)
    return Bound(kind: boundUnaryExpression, unaryOperator: operatorKind,
          unaryOperand: operand, dtype: resultDtype)
 
 func bindBinaryExpression(binder: Binder, node: Node): Bound =
-   assert node.kind == nodeBinaryExpression
+   assert node.kind == binaryExpression
    let boundLeft = binder.bindExpression(node.left)
    let boundRight = binder.bindExpression(node.right)
    let (operatorKind, resultDtype) = binder.getBinaryOperator(boundLeft.dtype,
@@ -252,7 +252,7 @@ func bindBinaryExpression(binder: Binder, node: Node): Bound =
          dtype: resultDtype)
 
 func bindAssignmentExpression(binder: Binder, node: Node): Bound =
-   assert node.kind == nodeAssignmentExpression
+   assert node.kind == assignmentExpression
    assert node.lvalue.kind == tokenIdentifier
    let rvalue = binder.bindExpression(node.rvalue)
    if not binder.scope.tryDeclare(Identifier(name: node.lvalue.text,
@@ -263,7 +263,7 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
          assignment: node.assignment, rvalue: rvalue)
 
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
-   assert node.kind == nodeConditionalExpression
+   assert node.kind == conditionalExpression
    let condition =
       if node.condition != nil:
          binder.bindExpression(node.condition)
@@ -283,23 +283,23 @@ func bindConditionalExpression(binder: Binder, node: Node): Bound =
 
 func bindExpression*(binder: Binder, node: Node): Bound =
    case node.kind
-   of nodeError:
+   of errorExpression:
       return binder.bindErrorExpression(node)
-   of nodeLiteral:
+   of literalExpression:
       return binder.bindLiteralExpression(node)
-   of nodeIdentifier:
+   of identifierExpression:
       return binder.bindIdentifierExpression(node)
-   of nodeUnaryExpression:
+   of unaryExpression:
       return binder.bindUnaryExpression(node)
-   of nodeBinaryExpression:
+   of binaryExpression:
       return binder.bindBinaryExpression(node)
-   of nodeParanthesisExpression:
+   of paranthesisExpression:
       return binder.bindExpression(node.expression)
-   of nodeAssignmentExpression:
+   of assignmentExpression:
       return binder.bindAssignmentExpression(node)
-   of nodeConditionalExpression:
+   of conditionalExpression:
       return binder.bindConditionalExpression(node)
-   of nodeCompilationUnit:
+   of compilationUnit:
       return
 
 func newBinder*(parent: BoundScope = nil): Binder =

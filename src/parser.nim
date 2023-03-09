@@ -5,40 +5,40 @@ import lexer, syntaxfacts, diagnostics
 
 type
    NodeKind* = enum
-      nodeError = "error expression"
-      nodeLiteral = "literal expression"
-      nodeIdentifier = "identifier expression"
-      nodeUnaryExpression = "unary expression"
-      nodeBinaryExpression = "binary expression"
-      nodeParanthesisExpression = "paranthesis expression"
-      nodeAssignmentExpression = "assignment expression"
-      nodeConditionalExpression = "conditional expression"
-      nodeCompilationUnit = "compilation unit expression"
+      errorExpression = "error expression"
+      literalExpression = "literal expression"
+      identifierExpression = "identifier expression"
+      unaryExpression = "unary expression"
+      binaryExpression = "binary expression"
+      paranthesisExpression = "paranthesis expression"
+      assignmentExpression = "assignment expression"
+      conditionalExpression = "conditional expression"
+      compilationUnit = "compilation unit"
 
    Node* = ref object
       case kind*: NodeKind
-      of nodeError: errorToken*: Token
-      of nodeLiteral: literal*: Token
-      of nodeIdentifier: identifier*: Token
-      of nodeUnaryExpression:
+      of errorExpression: errorToken*: Token
+      of literalExpression: literal*: Token
+      of identifierExpression: identifier*: Token
+      of unaryExpression:
          unaryOperator*: Token
          unaryOperand*: Node
-      of nodeBinaryExpression:
+      of binaryExpression:
          left*, right*: Node
          binaryOperator*: Token
-      of nodeParanthesisExpression:
+      of paranthesisExpression:
          open*, close*: Token
          expression*: Node
-      of nodeAssignmentExpression:
+      of assignmentExpression:
          lvalue*, assignment*: Token
          rvalue*: Node
-      of nodeConditionalExpression:
+      of conditionalExpression:
          conditionToken*: Token
          condition*: Node # nil for "else"
          colonToken*: Token
          conditional*: Node
          otherwise*: Node # if "elif" or "else" is present
-      of nodeCompilationUnit:
+      of compilationUnit:
          root*: Node
          eofToken*: Token
 
@@ -53,29 +53,29 @@ type
 func `$`*(node: Node): string =
    result = $node.kind & ": "
    case node.kind
-   of nodeError: result &= $node.errorToken
-   of nodeLiteral: result &= $node.literal
-   of nodeIdentifier: result &= $node.identifier
-   of nodeUnaryExpression:
+   of errorExpression: result &= $node.errorToken
+   of literalExpression: result &= $node.literal
+   of identifierExpression: result &= $node.identifier
+   of unaryExpression:
       result &= "\p"
       result &= indent($node.unaryOperator, 3) & "\p"
       result &= indent($node.unaryOperand, 3)
-   of nodeBinaryExpression:
+   of binaryExpression:
       result &= "\p"
       result &= indent($node.left, 3) & "\p"
       result &= indent($node.binaryOperator, 3) & "\p"
       result &= indent($node.right, 3)
-   of nodeParanthesisExpression:
+   of paranthesisExpression:
       result &= "\p"
       result &= indent($node.open, 3) & "\p"
       result &= indent($node.expression, 3) & "\p"
       result &= indent($node.close, 3)
-   of nodeAssignmentExpression:
+   of assignmentExpression:
       result &= "\p"
       result &= indent($node.lvalue, 3) & "\p"
       result &= indent($node.assignment, 3) & "\p"
       result &= indent($node.rvalue, 3)
-   of nodeConditionalExpression:
+   of conditionalExpression:
       result &= "\p"
       result &= indent($node.conditionToken, 3) & "\p"
       if node.condition != nil:
@@ -83,7 +83,7 @@ func `$`*(node: Node): string =
       result &= indent($node.conditional, 3) & "\p"
       if node.otherwise != nil:
          result &= indent($node.otherwise, 3) & "\p"
-   of nodeCompilationUnit:
+   of compilationUnit:
       result &= "\p"
       result &= indent($node.root, 3) & "\p"
       result &= indent($node.eofToken, 3)
@@ -133,7 +133,7 @@ func parseConditionalExpression(parser: var Parser): Node =
          parser.parseConditionalExpression
       else: nil
 
-   return Node(kind: nodeConditionalExpression, conditionToken: conditionToken,
+   return Node(kind: conditionalExpression, conditionToken: conditionToken,
          condition: condition, colonToken: colonToken, conditional: conditional,
          otherwise: otherwise)
 
@@ -143,7 +143,7 @@ func parseAssignmentExpression(parser: var Parser): Node =
       let lvalue = parser.nextToken
       let assignment = parser.nextToken
       let rvalue = parser.parseAssignmentExpression
-      return Node(kind: nodeAssignmentExpression, lvalue: lvalue,
+      return Node(kind: assignmentExpression, lvalue: lvalue,
             assignment: assignment, rvalue: rvalue)
    return parser.parseOperatorExpression
 
@@ -152,14 +152,14 @@ func parsePrimaryExpression(parser: var Parser): Node =
       let open = parser.nextToken
       let expression = parser.parseOperatorExpression
       let close = parser.matchToken(tokenParanthesisClose)
-      return Node(kind: nodeParanthesisExpression, open: open,
+      return Node(kind: paranthesisExpression, open: open,
             expression: expression, close: close)
    elif parser.current.kind in [tokenTrue, tokenFalse, tokenNumber]:
       let token = parser.nextToken
-      return Node(kind: nodeLiteral, literal: token)
+      return Node(kind: literalExpression, literal: token)
    elif parser.current.kind == tokenIdentifier:
       let token = parser.nextToken
-      return Node(kind: nodeIdentifier, identifier: token)
+      return Node(kind: identifierExpression, identifier: token)
    elif parser.current.kind == tokenIf:
       return parser.parseConditionalExpression
    else:
@@ -173,7 +173,7 @@ func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
    if unaryOperatorPrecedence != 0 and unaryOperatorPrecedence >= parentPrecedence:
       let operatorToken = parser.nextToken
       let operand = parser.parseOperatorExpression(unaryOperatorPrecedence)
-      result = Node(kind: nodeUnaryExpression, unaryOperator: operatorToken,
+      result = Node(kind: unaryExpression, unaryOperator: operatorToken,
             unaryOperand: operand)
    else:
       result = parser.parsePrimaryExpression
@@ -184,7 +184,7 @@ func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
          break
       let binaryOperator = parser.nextToken
       let right = parser.parseOperatorExpression(precedence)
-      result = Node(kind: nodeBinaryExpression, left: result,
+      result = Node(kind: binaryExpression, left: result,
             binaryOperator: binaryOperator, right: right)
 
 
