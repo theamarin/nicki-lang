@@ -2,10 +2,10 @@ import strutils
 
 type
    Dtype* = enum
-      terror
-      tvoid
-      tbool
-      tint
+      terror = "[error]"
+      tvoid = "void"
+      tbool = "bool"
+      tint = "int"
 
    Value* = object
       case dtype*: Dtype

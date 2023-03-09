@@ -284,7 +284,14 @@ func bindConditionalExpression(binder: Binder, node: Node): Bound =
    let otherwise =
       if node.otherwise != nil: binder.bindConditionalExpression(node.otherwise)
       else: nil
-   return Bound(kind: boundConditionalExpression,
+   if conditional.dtype != tvoid and node.conditionToken.kind != tokenElse:
+      if otherwise == nil:
+         binder.diagnostics.report(&"Missing else to return data type {conditional.dtype}",
+            node.conditionToken.pos)
+      elif otherwise.dtype != conditional.dtype:
+         binder.diagnostics.report(&"{node.conditionToken} is of type {conditional.dtype}, but {otherwise.conditionToken} is of type {otherwise.dtype}",
+            node.conditionToken.pos)
+   return Bound(kind: boundConditionalExpression, dtype: conditional.dtype,
          conditionToken: node.conditionToken, condition: condition,
          colonToken: node.colonToken, conditional: conditional,
          otherwise: otherwise)
