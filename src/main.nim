@@ -1,6 +1,5 @@
-import strutils, tables
+import strutils, tables, parseopt, os
 import parser, binder, evaluator, diagnostics
-
 
 var showTree = false
 var showBind = false
@@ -8,6 +7,34 @@ var showVars = false
 
 var myEvaluator = Evaluator()
 var myBinder = newBinder()
+
+var filename = ""
+var p = initOptParser(commandLineParams())
+for kind, key, val in p.getopt():
+   case kind
+   of cmdArgument: filename = key
+   of cmdLongOption, cmdShortOption:
+      echo "Error: Unknown option " & escape(key)
+      quit(QuitFailure)
+   of cmdEnd: assert(false) # cannot happen
+if filename != "":
+   let f = open(filename, fmRead)
+   let data = f.readAll()
+   f.close()
+   var parser = data.parse()
+   if parser.diagnostics.len > 0:
+      for report in parser.diagnostics:
+         writeLine(stdout, " ".repeat(report.pos) & "^  " & report.msg)
+      quit(QuitFailure)
+   let bound = myBinder.bindExpression(parser.root)
+   if myBinder.diagnostics.len > 0:
+      for report in myBinder.diagnostics:
+         writeLine(stdout, " ".repeat(report.pos) & "^  " & report.msg)
+      quit(QuitFailure)
+   let result = myEvaluator.evaluate(bound)
+   writeline(stdout, $result)
+   quit(QuitSuccess)
+
 
 const prompt = "> "
 
