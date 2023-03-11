@@ -21,15 +21,20 @@ if filename != "":
    let f = open(filename, fmRead)
    let data = f.readAll()
    f.close()
+   let lines = data.splitLines()
    var parser = data.parse()
    if parser.diagnostics.len > 0:
       for report in parser.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos) & "^  " & report.msg)
+         writeLine(stdout, lines[report.pos.line])
+         writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
+               filename & ":" & $report.pos)
       quit(QuitFailure)
    let bound = myBinder.bindExpression(parser.root)
    if myBinder.diagnostics.len > 0:
       for report in myBinder.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos) & "^  " & report.msg)
+         writeLine(stdout, lines[report.pos.line])
+         writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
+               filename & ":" & $report.pos)
       quit(QuitFailure)
    let result = myEvaluator.evaluate(bound)
    writeline(stdout, $result)
@@ -60,7 +65,7 @@ while true:
    if showTree: echo $parser.root
    if parser.diagnostics.len > 0:
       for report in parser.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos+prompt.len) & "^  " & report.msg)
+         writeLine(stdout, " ".repeat(report.pos.column+prompt.len) & "^  " & report.msg)
       parser.diagnostics.clear
       continue
 
@@ -68,7 +73,7 @@ while true:
    if showBind: echo $bound
    if myBinder.diagnostics.len > 0:
       for report in myBinder.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos+prompt.len) & "^  " & report.msg)
+         writeLine(stdout, " ".repeat(report.pos.column+prompt.len) & "^  " & report.msg)
       myBinder.diagnostics.clear
       continue
 

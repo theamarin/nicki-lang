@@ -55,17 +55,18 @@ type
       case kind*: TokenKind
       of tokenNumber: value*: Value
       else: discard
-      pos*: int
+      pos*: Position
       text*: string
 
 func `$`*(token: Token): string =
    if token.isNil: return "nil"
-   return fmt"{$token.kind} @ {$token.pos} ({escape(token.text)})"
+   result = fmt"{$token.kind} @ {$token.pos}"
+   if $token.kind != token.text: result &= " ({escape(token.text)})"
 
 type
    Lexer* = ref object
       text: string
-      pos: int
+      pos: Position
       tokens: seq[Token]
       diagnostics*: Diagnostics
 
@@ -93,24 +94,30 @@ const
 
 
 func current(l: Lexer): char =
-   if l.pos >= l.text.len: return '\0'
-   return l.text[l.pos]
+   if l.pos.abs >= l.text.len: return '\0'
+   return l.text[l.pos.abs]
 
-func next(l: var Lexer): int {.discardable.} =
+func advance(l: Lexer, n = 1) =
+   for i in 0..n-1:
+      if l.current() in Newlines:
+         l.pos.line.inc
+         l.pos.column = 0
+      else: l.pos.column.inc
+      l.pos.abs.inc
+
+func next(l: Lexer): Position {.discardable.} =
    result = l.pos
-   l.pos.inc
-
+   l.advance()
 
 func peek(l: Lexer, n = 1): char =
-   let pos = l.pos + n
+   let pos = l.pos.abs + n
    if pos >= l.text.len: return '\0'
    return l.text[pos]
 
-
-func lexNumber(l: var Lexer): Token =
+func lexNumber(l: Lexer): Token =
    let start = l.pos
    while l.current() in Digits: l.next
-   let text = l.text.substr(start, l.pos - 1)
+   let text = l.text.substr(start.abs, l.pos.abs - 1)
    let valInt =
       try: parseInt(text)
       except ValueError:
@@ -119,26 +126,26 @@ func lexNumber(l: var Lexer): Token =
    let value = Value(dtype: tint, valInt: valInt)
    return Token(kind: tokenNumber, pos: start, text: text, value: value)
 
-func lexWhitespace(l: var Lexer): Token =
+func lexWhitespace(l: Lexer): Token =
    let start = l.pos
    while l.current() in Whitespace: l.next
-   let text = l.text.substr(start, l.pos - 1)
+   let text = l.text.substr(start.abs, l.pos.abs - 1)
    return Token(kind: tokenWhitespace, pos: start, text: text)
 
-func lexWord(l: var Lexer): Token =
+func lexWord(l: Lexer): Token =
    let start = l.pos
    doAssert l.current() in IdentStartChars
    while l.current() in IdentChars: l.next
-   let text = l.text.substr(start, l.pos - 1)
+   let text = l.text.substr(start.abs, l.pos.abs - 1)
    let token = if text in keywords: keywords[text] else: tokenIdentifier
    return Token(kind: token, pos: start, text: text)
 
 func newToken(l: Lexer, kind: TokenKind, text = ""): Token =
    let myText = if text.len > 0: text else: $kind
    result = Token(kind: kind, pos: l.pos, text: myText)
-   l.pos += myText.len
+   l.advance(myText.len)
 
-func nextToken(l: var Lexer): Token =
+func nextToken(l: Lexer): Token =
    case l.current()
    of '\0':
       return l.newToken(tokenEof, "\0")
@@ -193,7 +200,7 @@ func nextToken(l: var Lexer): Token =
       return l.newToken(tokenBraceClose)
    else:
       l.diagnostics.report("Bad character input " & escape($l.current()), l.pos)
-      let text: string = $l.text[l.pos]
+      let text: string = $l.text[l.pos.abs]
       return Token(kind: tokenBad, pos: l.next, text: text)
 
 func lex*(text: string): Lexer =

@@ -1,13 +1,18 @@
 type
-   Report = ref object
+   Position* = object
+      line*, column*, abs*: int
+   Span* = ref object
+      start*, `end`*: Position
+   Report* = ref object
       msg*: string
-      pos*: int
+      pos*: Position
    Diagnostics* = object
       reports: seq[Report]
 
+func `$`*(pos: Position): string =
+   return $(pos.line+1) & ":" & $(pos.column+1)
 
-
-func report*(d: var Diagnostics, msg: string, pos: int) =
+func report*(d: var Diagnostics, msg: string, pos: Position) =
    d.reports.add(Report(msg: msg, pos: pos))
 
 func add*(d: var Diagnostics, report: Report) =
