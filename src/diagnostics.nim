@@ -1,3 +1,5 @@
+import strutils
+
 type
    Position* = object
       line*, column*, abs*: int
@@ -12,9 +14,6 @@ type
 func `$`*(pos: Position): string =
    return $(pos.line+1) & ":" & $(pos.column+1)
 
-func report*(d: var Diagnostics, msg: string, pos: Position) =
-   d.reports.add(Report(msg: msg, pos: pos))
-
 func add*(d: var Diagnostics, report: Report) =
    d.reports.add(report)
 
@@ -25,3 +24,49 @@ func clear*(d: var Diagnostics) = d.reports = newSeq[Report]()
 iterator items*(d: Diagnostics): Report =
    for r in d.reports:
       yield r
+
+func report(d: var Diagnostics, msg: string, pos: Position) =
+   d.reports.add(Report(msg: msg, pos: pos))
+
+# Lexer
+func reportCannotParseNumber*(self: var Diagnostics, pos: Position, text: string) =
+   self.report("Cannot parse number: " & escape(text), pos)
+
+func reportBadCharacter*(self: var Diagnostics, pos: Position, text: string) =
+   self.report("Bad character input " & escape(text), pos)
+
+# Parser
+func reportUnexpectedToken*(self: var Diagnostics, pos: Position, actual: string, expected: string) =
+   self.report("Unexpected token " & escape(actual) & ", expected " & escape(expected), pos)
+
+
+# Binder
+func reportUndefinedUnaryOperator*(self: var Diagnostics, pos: Position, opKind: string,
+      dtype: string) =
+   self.report("Unary operator " & escape(opKind) & " not defined for dtype " &
+         escape(dtype), pos)
+
+func reportUndefinedBinaryOperator*(self: var Diagnostics, pos: Position,
+      opKind: string, leftDtype: string, rightDtype: string) =
+   self.report("Binary operator " & escape(opKind) & " not defined for dtypes " &
+         escape(leftDtype) & " and " & escape(rightDtype), pos)
+
+func reportUndefinedIdentifier*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Undefined identifier " & escape(name), pos)
+
+func reportAlreadyDeclaredIdentifier*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Identifier " & escape(name) & " already declared", pos)
+
+func reportConditionNotBoolean*(self: var Diagnostics, pos: Position) =
+   self.report("Condition is not boolean", pos)
+
+func reportMissingElse*(self: var Diagnostics, pos: Position, dtype: string) =
+   self.report("Missing else to return data type " & escape(dtype), pos)
+
+func reportInconsistentConditionals*(self: var Diagnostics, pos: Position,
+      conditionToken: string, conditionalDtype: string,
+      otherwiseToken: string, otherwiseDtype: string) =
+   self.report("Inconsistent data type in conditional expression: " &
+         escape(conditionToken) & " returns type " & escape(conditionalDtype) &
+         ", but " & escape(otherwiseToken) & " returns type " & escape(otherwiseDtype),
+         pos)

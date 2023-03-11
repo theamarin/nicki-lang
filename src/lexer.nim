@@ -121,8 +121,7 @@ func lexNumber(l: Lexer): Token =
    let valInt =
       try: parseInt(text)
       except ValueError:
-         l.diagnostics.report("Cannot parse number: " & escape(text), start)
-         0
+         l.diagnostics.reportCannotParseNumber(start, text); 0
    let value = Value(dtype: tint, valInt: valInt)
    return Token(kind: tokenNumber, pos: start, text: text, value: value)
 
@@ -199,7 +198,7 @@ func nextToken(l: Lexer): Token =
    of '}':
       return l.newToken(tokenBraceClose)
    else:
-      l.diagnostics.report("Bad character input " & escape($l.current()), l.pos)
+      l.diagnostics.reportBadCharacter(l.pos, $l.current())
       let text: string = $l.text[l.pos.abs]
       return Token(kind: tokenBad, pos: l.next, text: text)
 

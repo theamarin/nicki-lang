@@ -102,18 +102,16 @@ func nextToken(parser: var Parser): Token =
 func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
    if parser.current.kind == kind:
       return parser.nextToken
-   parser.diagnostics.report("Parser: Unexpected token " & escape(
-         $parser.current.kind) & ", expected " & escape($kind),
-               parser.current.pos)
-   return Token()
+   else:
+      parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind, $kind)
+      return Token()
 
 func matchToken(parser: var Parser, kinds: set[TokenKind]): Token =
    if parser.current.kind in kinds:
       return parser.nextToken
-   parser.diagnostics.report("Parser: Unexpected token " & escape(
-         $parser.current.kind) & ", expected " & escape($kinds),
-               parser.current.pos)
-   return Token()
+   else:
+      parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind, $kinds)
+      return Token()
 
 
 func parseAssignmentExpression(parser: var Parser): Node
@@ -177,9 +175,10 @@ func parsePrimaryExpression(parser: var Parser): Node =
    elif parser.current.kind == tokenBraceOpen:
       return parser.parseBlockExpression
    else:
-      parser.diagnostics.report("Parser: Unexpected token " & escape(
-            $parser.current.kind) & " for primary expression",
-            parser.current.pos)
+      let expectedKinds = {tokenParanthesisOpen, tokenTrue, tokenFalse, tokenNumber,
+            tokenIdentifier, tokenIf, tokenBraceOpen}
+      parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind,
+            $expectedKinds)
       return Node()
 
 func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =

@@ -1,10 +1,12 @@
-import strutils, strformat, tables
+import strutils, tables
 import parser, lexer, dtype, diagnostics
 
 type
    Identifier* = ref object
       name*: string
       dtype*: Dtype
+      declarationPos*: Position
+
    BoundScope* = ref object
       identifiers*: Table[string, Identifier]
       parent*: BoundScope
@@ -157,9 +159,7 @@ func getUnaryOperator(binder: Binder, token: Token,
    if (token.kind, dtype) in boundUnaryOperators:
       return boundUnaryOperators[(token.kind, dtype)]
    elif dtype == terror: discard
-   else:
-      binder.diagnostics.report("Error: Unary operator " & escape($token.kind) &
-            " not defined for dtype " & escape($dtype), token.pos)
+   else: binder.diagnostics.reportUndefinedUnaryOperator(token.pos, $token.kind, $dtype)
 
 func getBinaryOperator(binder: Binder, leftDtype: Dtype, token: Token,
       rightDtype: Dtype): BoundBinaryOperatorResult =
@@ -167,10 +167,8 @@ func getBinaryOperator(binder: Binder, leftDtype: Dtype, token: Token,
       return boundBinaryOperators[(leftDtype, token.kind, rightDtype)]
    elif terror in [leftDtype, rightDtype]: discard
    else:
-      binder.diagnostics.report("Binary operator " & escape($token.kind) &
-         " not defined for dtypes " & escape($leftDtype) & " and " &
-         escape($rightDtype), token.pos)
-
+      binder.diagnostics.reportUndefinedBinaryOperator(token.pos, $token.kind,
+            $leftDtype, $rightDtype)
 
 
 func `$`*(bound: Bound): string =
@@ -229,12 +227,10 @@ func bindIdentifierExpression(binder: Binder, node: Node): Bound =
    let name = node.identifier.text
    let identifier = binder.scope.tryLookup(name)
    var dtype: Dtype
-   if identifier == nil:
-      binder.diagnostics.report("Unknown identifier " & escape(name),
-            node.identifier.pos)
-      dtype = terror
+   if identifier != nil: dtype = identifier.dtype
    else:
-      dtype = identifier.dtype
+      binder.diagnostics.reportUndefinedIdentifier(node.identifier.pos, name)
+      dtype = terror
    return Bound(kind: boundIdentifierExpression, dtype: dtype,
          identifier: identifier)
 
@@ -261,8 +257,8 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
    let rvalue = binder.bindExpression(node.rvalue)
    if not binder.scope.tryDeclare(Identifier(name: node.lvalue.text,
          dtype: rvalue.dtype)):
-      binder.diagnostics.report(&"Identifier {escape(node.lvalue.text)} already declared",
-            node.lvalue.pos)
+      binder.diagnostics.reportAlreadyDeclaredIdentifier(node.lvalue.pos,
+            node.lvalue.text)
    return Bound(kind: boundAssignmentExpression, dtype: rvalue.dtype,
          lvalue: node.lvalue, assignment: node.assignment, rvalue: rvalue)
 
@@ -273,19 +269,19 @@ func bindConditionalExpression(binder: Binder, node: Node): Bound =
          binder.bindExpression(node.condition)
       else: nil
    if condition != nil and condition.dtype != tbool:
-      binder.diagnostics.report(&"Condition is not boolean",
-            node.conditionToken.pos)
+      binder.diagnostics.reportConditionNotBoolean(node.conditionToken.pos)
    let conditional = binder.bindExpression(node.conditional)
    let otherwise =
       if node.otherwise != nil: binder.bindConditionalExpression(node.otherwise)
       else: nil
    if conditional.dtype != tvoid and node.conditionToken.kind != tokenElse:
       if otherwise == nil:
-         binder.diagnostics.report(&"Missing else to return data type {conditional.dtype}",
-            node.conditionToken.pos)
+         binder.diagnostics.reportMissingElse(node.conditionToken.pos,
+               $conditional.dtype)
       elif otherwise.dtype != conditional.dtype:
-         binder.diagnostics.report(&"{node.conditionToken} is of type {conditional.dtype}, but {otherwise.conditionToken} is of type {otherwise.dtype}",
-            node.conditionToken.pos)
+         binder.diagnostics.reportInconsistentConditionals(node.conditionToken.pos,
+               $node.conditionToken.text, $conditional.dtype,
+               $otherwise.conditionToken.text, $otherwise.dtype)
    return Bound(kind: boundConditionalExpression, dtype: conditional.dtype,
          conditionToken: node.conditionToken, condition: condition,
          colonToken: node.colonToken, conditional: conditional,
