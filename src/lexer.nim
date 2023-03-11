@@ -19,8 +19,17 @@ type
       tokenIf = "if"
       tokenElif = "elif"
       tokenElse = "else"
+      tokenFor = "for"
+      tokenWhile = "while"
       tokenDef = "def"
       tokenConst = "const"
+      tokenPublic = "public"
+      tokenObject = "object"
+      tokenEnum = "enum"
+      tokenContinue = "continue"
+      tokenBreak = "break"
+      tokenReturn = "return"
+      tokenYield = "yield"
 
       # Operators
       tokenColon = ":"
@@ -87,8 +96,17 @@ const
       ("if", tokenIf),
       ("elif", tokenElif),
       ("else", tokenElse),
+      ("for", tokenFor),
+      ("while", tokenWhile),
       ("def", tokenDef),
       ("const", tokenConst),
+      ("public", tokenPublic),
+      ("object", tokenObject),
+      ("enum", tokenEnum),
+      ("continue", tokenContinue),
+      ("break", tokenBreak),
+      ("return", tokenReturn),
+      ("yield", tokenYield),
    ]
    keywords: Keywords = keywordList.toTable
 
