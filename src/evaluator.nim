@@ -11,6 +11,7 @@ func `$`*(val: Value): string =
    of tvoid: return "[void]"
    of tbool: return $val.valBool
    of tint: return $val.valInt
+   of tstring: return $val.valString
 
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind

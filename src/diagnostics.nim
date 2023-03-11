@@ -35,8 +35,12 @@ func reportCannotParseNumber*(self: var Diagnostics, pos: Position, text: string
 func reportBadCharacter*(self: var Diagnostics, pos: Position, text: string) =
    self.report("Bad character input " & escape(text), pos)
 
+func reportUnterminatedString*(self: var Diagnostics, pos: Position) =
+   self.report("Unterminated string", pos)
+
 # Parser
-func reportUnexpectedToken*(self: var Diagnostics, pos: Position, actual: string, expected: string) =
+func reportUnexpectedToken*(self: var Diagnostics, pos: Position, actual: string,
+      expected: string) =
    self.report("Unexpected token " & escape(actual) & ", expected " & escape(expected), pos)
 
 

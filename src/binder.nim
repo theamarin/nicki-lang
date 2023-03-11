@@ -212,12 +212,14 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
    case node.literal.kind
    of tokenNumber:
       let value = node.literal.value
-      return Bound(kind: boundLiteralExpression, value: value,
-            dtype: value.dtype)
+      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
    of tokenTrue, tokenFalse:
       let value = Value(dtype: tbool, valBool: node.literal.kind == tokenTrue)
       return Bound(kind: boundLiteralExpression, value: value,
             dtype: value.dtype)
+   of tokenString:
+      let value = Value(dtype: tstring, valString: node.literal.text)
+      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literal.kind))
 

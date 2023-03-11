@@ -164,7 +164,7 @@ func parsePrimaryExpression(parser: var Parser): Node =
       let close = parser.matchToken(tokenParanthesisClose)
       return Node(kind: paranthesisExpression, open: open,
             expression: expression, close: close)
-   elif parser.current.kind in [tokenTrue, tokenFalse, tokenNumber]:
+   elif parser.current.kind in literalTokens:
       let token = parser.nextToken
       return Node(kind: literalExpression, literal: token)
    elif parser.current.kind == tokenIdentifier:

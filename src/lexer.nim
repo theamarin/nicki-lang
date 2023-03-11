@@ -7,8 +7,9 @@ type
       tokenEof = "[EOF]"
 
       tokenWhitespace = "[whitespace]"
-      tokenNumber = "[number]"
       tokenIdentifier = "[identifier]"
+      tokenNumber = "[number]"
+      tokenString = "[string]"
 
       # Keywords (need to be added to keyword list below)
       tokenTrue = "true"
@@ -110,6 +111,8 @@ const
    ]
    keywords: Keywords = keywordList.toTable
 
+   literalTokens* = {tokenNumber, tokenString, tokenTrue, tokenFalse}
+
 
 func current(l: Lexer): char =
    if l.pos.abs >= l.text.len: return '\0'
@@ -156,6 +159,19 @@ func lexWord(l: Lexer): Token =
    let text = l.text.substr(start.abs, l.pos.abs - 1)
    let token = if text in keywords: keywords[text] else: tokenIdentifier
    return Token(kind: token, pos: start, text: text)
+
+func lexString(l: Lexer): Token =
+   let start = l.pos
+   doAssert l.current() == '"'
+   l.next
+   while l.current() notin {'"', '\0', '\n', '\r'}:
+      l.next
+   if l.current() == '"':
+      l.next
+   else:
+      l.diagnostics.reportUnterminatedString(start)
+   let text = l.text.substr(start.abs+1, l.pos.abs - 2)
+   return Token(kind: tokenString, pos: start, text: text)
 
 func newToken(l: Lexer, kind: TokenKind, text = ""): Token =
    let myText = if text.len > 0: text else: $kind
@@ -215,6 +231,8 @@ func nextToken(l: Lexer): Token =
       return l.newToken(tokenBraceOpen)
    of '}':
       return l.newToken(tokenBraceClose)
+   of '"':
+      return l.lexString()
    else:
       l.diagnostics.reportBadCharacter(l.pos, $l.current())
       let text: string = $l.text[l.pos.abs]
