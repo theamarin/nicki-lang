@@ -31,6 +31,7 @@ type
       tokenBreak = "break"
       tokenReturn = "return"
       tokenYield = "yield"
+      tokenDiscard = "discard"
 
       # Operators
       tokenColon = ":"
@@ -108,6 +109,7 @@ const
       ("break", tokenBreak),
       ("return", tokenReturn),
       ("yield", tokenYield),
+      ("discard", tokenDiscard),
    ]
    keywords: Keywords = keywordList.toTable
 

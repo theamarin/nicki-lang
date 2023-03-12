@@ -76,6 +76,7 @@ type
       boundBinaryExpression = "binary expression"
       boundAssignmentExpression = "assignment expression"
       boundConditionalExpression = "conditional expression"
+      boundWhileExpression = "while expression"
       boundBlockExpression = "block expression"
 
    Bound* = ref object
@@ -104,6 +105,11 @@ type
          colonToken*: Token
          conditional*: Bound
          otherwise*: Bound # if "elif" or "else" is present
+      of boundWhileExpression:
+         whileToken*: Token
+         whileCondition*: Bound
+         whileColon*: Token
+         whileBody*: Bound
       of boundBlockExpression:
          blockStart*: Token
          blockExpressions*: seq[Bound]
@@ -196,6 +202,11 @@ func `$`*(bound: Bound): string =
       result &= "\p" & indent($bound.conditional, 3)
       if bound.otherwise != nil:
          result &= "\p" & indent($bound.otherwise, 3)
+   of boundWhileExpression:
+      result &= "\p" & indent($bound.whileToken, 3)
+      result &= "\p" & indent($bound.whileCondition, 3)
+      result &= "\p" & indent($bound.whileColon, 3)
+      result &= "\p" & indent($bound.whileBody, 3)
    of boundBlockExpression:
       for expression in bound.blockExpressions:
          result &= "\p" & indent($expression, 3)
@@ -289,6 +300,14 @@ func bindConditionalExpression(binder: Binder, node: Node): Bound =
          colonToken: node.colonToken, conditional: conditional,
          otherwise: otherwise)
 
+func bindWhileExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == whileExpression
+   let whileCondition = binder.bindExpression(node.whileCondition)
+   let whileBody = binder.bindExpression(node.whileBody)
+   return Bound(kind: boundWhileExpression, dtype: tvoid, whileToken: node.whileToken,
+         whileCondition: whileCondition, whileColon: node.whileColon,
+         whileBody: whileBody)
+
 func bindBlockExpression(binder: Binder, node: Node): Bound =
    assert node.kind == blockExpression
    var blockExpressions: seq[Bound]
@@ -317,6 +336,8 @@ func bindExpression*(binder: Binder, node: Node): Bound =
       return binder.bindAssignmentExpression(node)
    of conditionalExpression:
       return binder.bindConditionalExpression(node)
+   of whileExpression:
+      return binder.bindWhileExpression(node)
    of blockExpression:
       return binder.bindBlockExpression(node)
    of compilationUnit:

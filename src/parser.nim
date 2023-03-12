@@ -13,6 +13,7 @@ type
       paranthesisExpression = "paranthesis expression"
       assignmentExpression = "assignment expression"
       conditionalExpression = "conditional expression"
+      whileExpression = "while expression"
       blockExpression = "block expression"
       compilationUnit = "compilation unit"
 
@@ -39,6 +40,11 @@ type
          colonToken*: Token
          conditional*: Node
          otherwise*: Node # if "elif" or "else" is present
+      of whileExpression:
+         whileToken*: Token
+         whileCondition*: Node
+         whileColon*: Token
+         whileBody*: Node
       of blockExpression:
          blockStart*: Token
          blockExpressions*: seq[Node]
@@ -83,6 +89,11 @@ func `$`*(node: Node): string =
       result &= "\p" & indent($node.conditional, 3)
       if node.otherwise != nil:
          result &= "\p" & indent($node.otherwise, 3)
+   of whileExpression:
+      result &= "\p" & indent($node.whileToken, 3)
+      result &= "\p" & indent($node.whileCondition, 3)
+      result &= "\p" & indent($node.whileColon, 3)
+      result &= "\p" & indent($node.whileBody, 3)
    of blockExpression:
       for expression in node.blockExpressions:
          result &= "\p" & indent($expression, 3)
@@ -137,6 +148,14 @@ func parseConditionalExpression(parser: var Parser): Node =
          condition: condition, colonToken: colonToken, conditional: conditional,
          otherwise: otherwise)
 
+func parseWhileExpression(parser: var Parser): Node =
+   let whileToken = parser.matchToken(tokenWhile)
+   let condition = parser.parseExpression()
+   let colonToken = parser.matchToken(tokenColon)
+   let body = parser.parseExpression()
+   return Node(kind: whileExpression, whileToken: whileToken, whileCondition: condition,
+         whileColon: colonToken, whileBody: body)
+
 func parseBlockExpression(parser: var Parser): Node =
    let blockStart = parser.matchToken(tokenBraceOpen)
    var blockExpressions: seq[Node]
@@ -151,32 +170,34 @@ func parseBlockExpression(parser: var Parser): Node =
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:
       let lvalue = parser.nextToken
-      let assignment = parser.nextToken
-      let rvalue = parser.parseAssignmentExpression
+      let assignment = parser.nextToken()
+      let rvalue = parser.parseAssignmentExpression()
       return Node(kind: assignmentExpression, lvalue: lvalue,
             assignment: assignment, rvalue: rvalue)
-   return parser.parseOperatorExpression
+   return parser.parseOperatorExpression()
 
 func parsePrimaryExpression(parser: var Parser): Node =
    if parser.current.kind == tokenParanthesisOpen:
-      let open = parser.nextToken
+      let open = parser.nextToken()
       let expression = parser.parseOperatorExpression
       let close = parser.matchToken(tokenParanthesisClose)
       return Node(kind: paranthesisExpression, open: open,
             expression: expression, close: close)
    elif parser.current.kind in literalTokens:
-      let token = parser.nextToken
+      let token = parser.nextToken()
       return Node(kind: literalExpression, literal: token)
    elif parser.current.kind == tokenIdentifier:
-      let token = parser.nextToken
+      let token = parser.nextToken()
       return Node(kind: identifierExpression, identifier: token)
    elif parser.current.kind == tokenIf:
-      return parser.parseConditionalExpression
+      return parser.parseConditionalExpression()
+   elif parser.current.kind == tokenWhile:
+      return parser.parseWhileExpression()
    elif parser.current.kind == tokenBraceOpen:
-      return parser.parseBlockExpression
+      return parser.parseBlockExpression()
    else:
       let expectedKinds = {tokenParanthesisOpen, tokenTrue, tokenFalse, tokenNumber,
-            tokenIdentifier, tokenIf, tokenBraceOpen}
+            tokenIdentifier, tokenIf, tokenWhile, tokenBraceOpen}
       parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind,
             $expectedKinds)
       return Node()

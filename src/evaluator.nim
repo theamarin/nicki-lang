@@ -57,6 +57,10 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       elif node.otherwise != nil:
          return self.evaluate(node.otherwise)
       else: return Value(dtype: terror)
+   of boundWhileExpression:
+      while self.evaluate(node.whileCondition).valBool:
+         discard self.evaluate(node.whileBody)
+      return Value(dtype: tvoid)
    of boundBlockExpression:
       for expression in node.blockExpressions:
          discard self.evaluate(expression)
