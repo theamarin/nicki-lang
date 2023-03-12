@@ -11,6 +11,7 @@ type
       unaryExpression = "unary expression"
       binaryExpression = "binary expression"
       paranthesisExpression = "paranthesis expression"
+      definitionExpression = "definition expression"
       assignmentExpression = "assignment expression"
       conditionalExpression = "conditional expression"
       whileExpression = "while expression"
@@ -31,6 +32,11 @@ type
       of paranthesisExpression:
          open*, close*: Token
          expression*: Node
+      of definitionExpression:
+         defToken*: Token
+         defIdentifier*: Token
+         defColon*: Token
+         defDtype*: Token
       of assignmentExpression:
          lvalue*, assignment*: Token
          rvalue*: Node
@@ -78,6 +84,11 @@ func `$`*(node: Node): string =
       result &= "\p" & indent($node.open, 3)
       result &= "\p" & indent($node.expression, 3)
       result &= "\p" & indent($node.close, 3)
+   of definitionExpression:
+      result &= "\p" & indent($node.defToken, 3)
+      result &= "\p" & indent($node.defIdentifier, 3)
+      result &= "\p" & indent($node.defColon, 3)
+      result &= "\p" & indent($node.defDtype, 3)
    of assignmentExpression:
       result &= "\p" & indent($node.lvalue, 3)
       result &= "\p" & indent($node.assignment, 3)
@@ -166,6 +177,13 @@ func parseBlockExpression(parser: var Parser): Node =
    return Node(kind: blockExpression, blockStart: blockStart,
          blockExpressions: blockExpressions, blockEnd: blockEnd)
 
+func parseDefinitionExpression(parser: var Parser): Node =
+   let defToken = parser.matchToken(tokenDef)
+   let defIdentifier = parser.matchToken(tokenIdentifier)
+   let defColon = parser.matchToken(tokenColon)
+   let defDtype = parser.matchToken(tokenIdentifier)
+   return Node(kind: definitionExpression, defToken: defToken, defIdentifier: defIdentifier,
+         defColon: defColon, defDtype: defDtype)
 
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:
@@ -189,6 +207,8 @@ func parsePrimaryExpression(parser: var Parser): Node =
    elif parser.current.kind == tokenIdentifier:
       let token = parser.nextToken()
       return Node(kind: identifierExpression, identifier: token)
+   elif parser.current.kind == tokenDef:
+      return parser.parseDefinitionExpression()
    elif parser.current.kind == tokenIf:
       return parser.parseConditionalExpression()
    elif parser.current.kind == tokenWhile:

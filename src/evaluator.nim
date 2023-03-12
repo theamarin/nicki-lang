@@ -51,6 +51,9 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       let lvalue = node.lvalue
       self.variables[lvalue.text] = rvalue
       return rvalue
+   of boundDefinitionExpression:
+      self.variables[node.defIdentifier.text] = Value(dtype: node.dtype)
+      return Value(dtype: tvoid)
    of boundConditionalExpression:
       if node.condition == nil or self.evaluate(node.condition).valBool:
          return self.evaluate(node.conditional)

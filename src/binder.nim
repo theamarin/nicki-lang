@@ -18,8 +18,8 @@ func tryDeclare*(self: BoundScope, identifier: Identifier): bool =
 
 func tryLookup*(self: BoundScope, name: string): Identifier =
    if name in self.identifiers: return self.identifiers[name]
-   if self.parent != nil: return self.parent.tryLookup(name)
-   return nil
+   elif self.parent != nil: return self.parent.tryLookup(name)
+   else: return nil
 
 
 type
@@ -75,6 +75,7 @@ type
       boundUnaryExpression = "unary expression"
       boundBinaryExpression = "binary expression"
       boundAssignmentExpression = "assignment expression"
+      boundDefinitionExpression = "definition expression"
       boundConditionalExpression = "conditional expression"
       boundWhileExpression = "while expression"
       boundBlockExpression = "block expression"
@@ -99,6 +100,11 @@ type
          lvalue*: Token
          assignment*: Token
          rvalue*: Bound
+      of boundDefinitionExpression:
+         defToken*: Token
+         defIdentifier*: Token
+         defColon*: Token
+         defDtype*: Token
       of boundConditionalExpression:
          conditionToken*: Token
          condition*: Bound # nil for "else"
@@ -195,6 +201,11 @@ func `$`*(bound: Bound): string =
       result &= "\p" & indent($bound.lvalue, 3)
       result &= "\p" & indent($bound.assignment, 3)
       result &= "\p" & indent($bound.rvalue, 3)
+   of boundDefinitionExpression:
+      result &= "\p" & indent($bound.defToken, 3)
+      result &= "\p" & indent($bound.defIdentifier, 3)
+      result &= "\p" & indent($bound.defColon, 3)
+      result &= "\p" & indent($bound.defDtype, 3)
    of boundConditionalExpression:
       result &= "\p" & indent($bound.conditionToken, 3)
       if bound.condition != nil:
@@ -268,12 +279,22 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
    assert node.kind == assignmentExpression
    assert node.lvalue.kind == tokenIdentifier
    let rvalue = binder.bindExpression(node.rvalue)
-   if not binder.scope.tryDeclare(Identifier(name: node.lvalue.text,
-         dtype: rvalue.dtype)):
-      binder.diagnostics.reportAlreadyDeclaredIdentifier(node.lvalue.pos,
-            node.lvalue.text)
+   let identifier = binder.scope.tryLookup(node.lvalue.text)
+   if identifier == nil:
+      binder.diagnostics.reportUndefinedIdentifier(node.lvalue.pos, node.lvalue.text)
+   elif identifier.dtype != rvalue.dtype:
+      binder.diagnostics.reportCannotCast(node.assignment.pos, $rvalue.dtype, $identifier.dtype)
    return Bound(kind: boundAssignmentExpression, dtype: rvalue.dtype,
          lvalue: node.lvalue, assignment: node.assignment, rvalue: rvalue)
+
+func bindDefinitionExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == definitionExpression
+   assert node.defToken.kind == tokenDef
+   let dtype = node.defDtype.text.toDtype
+   if not binder.scope.tryDeclare(Identifier(name: node.defIdentifier.text, dtype: dtype)):
+      binder.diagnostics.reportAlreadyDeclaredIdentifier(node.defToken.pos, node.defToken.text)
+   return Bound(kind: boundDefinitionExpression, dtype: dtype, defToken: node.defToken,
+         defIdentifier: node.defIdentifier, defColon: node.defColon, defDtype: node.defDtype)
 
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
    assert node.kind == conditionalExpression
@@ -334,6 +355,8 @@ func bindExpression*(binder: Binder, node: Node): Bound =
       return binder.bindExpression(node.expression)
    of assignmentExpression:
       return binder.bindAssignmentExpression(node)
+   of definitionExpression:
+      return binder.bindDefinitionExpression(node)
    of conditionalExpression:
       return binder.bindConditionalExpression(node)
    of whileExpression:
