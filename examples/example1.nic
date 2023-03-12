@@ -1,0 +1,9 @@
+{
+   def x: bool
+   def y: int
+   while x:
+   {
+      y = y + 1
+      if y > 5: x = false else: false
+   }
+}
