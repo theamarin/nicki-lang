@@ -1,5 +1,5 @@
 import strutils, tables
-import parser, lexer, dtype, diagnostics
+import parser, lexer, operators, dtype, diagnostics
 
 type
    Identifier* = ref object
@@ -21,53 +21,7 @@ func tryLookup*(self: BoundScope, name: string): Identifier =
    elif self.parent != nil: return self.parent.tryLookup(name)
    else: return nil
 
-
 type
-   BoundUnaryOperatorKind* = enum
-      boundUnaryPlus
-      boundUnaryMinus
-      boundUnaryNot
-
-   BoundUnaryOperatorMatch = tuple
-      tokenKind: TokenKind
-      operandDtype: Dtype
-   BoundUnaryOperatorResult = tuple
-      operatorKind: BoundUnaryOperatorKind
-      resultDtype: Dtype
-   BoundUnaryOperator = tuple
-      match: BoundUnaryOperatorMatch
-      result: BoundUnaryOperatorResult
-   BoundUnaryOperators = Table[BoundUnaryOperatorMatch, BoundUnaryOperatorResult]
-
-   BoundBinaryOperatorKind* = enum
-      boundBinaryAddition,
-      boundBinarySubtraction,
-      boundBinaryMultiplication,
-      boundBinaryDivision,
-      boundBinaryEquals,
-      boundBinaryNotEquals,
-      boundBinaryGreaterThan,
-      boundBinaryGreaterEquals,
-      boundBinaryLessThan,
-      boundBinaryLessEquals,
-      boundBinaryCompinedComparison,
-      boundBinaryLogicalAnd,
-      boundBinaryLogicalOr
-      boundBinaryLogicalXor
-
-   BoundBinaryOperatorMatch = tuple
-      leftDtype: Dtype
-      tokenKind: TokenKind
-      rightDtype: Dtype
-   BoundBinaryOperatorResult = tuple
-      operatorKind: BoundBinaryOperatorKind
-      resultDtype: Dtype
-   BoundBinaryOperator = tuple
-      match: BoundBinaryOperatorMatch
-      result: BoundBinaryOperatorResult
-   BoundBinaryOperators = Table[BoundBinaryOperatorMatch, BoundBinaryOperatorResult]
-
-
    BoundKind* = enum
       boundError = "error expression",
       boundLiteralExpression = "literal expression"
@@ -125,62 +79,6 @@ type
       root*: Bound
       diagnostics*: Diagnostics
       scope*: BoundScope
-
-const
-   boundUnaryOperatorList: seq[BoundUnaryOperator] = @[
-      ((tokenPlus, tint), (boundUnaryPlus, tint)),
-      ((tokenMinus, tint), (boundUnaryMinus, tint)),
-      ((tokenBang, tbool), (boundUnaryNot, tbool)),
-   ]
-   boundUnaryOperators: BoundUnaryOperators = boundUnaryOperatorList.toTable
-
-   boundBinaryOperatorList: seq[BoundBinaryOperator] = @[
-      ((tint, tokenPlus, tint), (boundBinaryaddition, tint)),
-      ((tint, tokenMinus, tint), (boundBinarySubtraction, tint)),
-      ((tint, tokenStar, tint), (boundBinaryMultiplication, tint)),
-      ((tint, tokenSlash, tint), (boundBinaryDivision, tint)),
-
-      ((tbool, tokenEqualsEquals, tbool), (boundBinaryEquals, tbool)),
-      ((tbool, tokenBangEquals, tbool), (boundBinaryNotEquals, tbool)),
-      ((tbool, tokenGreater, tbool), (boundBinaryGreaterThan, tbool)),
-      ((tbool, tokenGreaterEquals, tbool), (boundBinaryGreaterEquals, tbool)),
-      ((tbool, tokenLess, tbool), (boundBinaryLessThan, tbool)),
-      ((tbool, tokenLessEquals, tbool), (boundBinaryLessEquals, tbool)),
-
-      ((tint, tokenEqualsEquals, tint), (boundBinaryEquals, tbool)),
-      ((tint, tokenBangEquals, tint), (boundBinaryNotEquals, tbool)),
-      ((tint, tokenGreater, tint), (boundBinaryGreaterThan, tbool)),
-      ((tint, tokenGreaterEquals, tint), (boundBinaryGreaterEquals, tbool)),
-      ((tint, tokenLess, tint), (boundBinaryLessThan, tbool)),
-      ((tint, tokenLessEquals, tint), (boundBinaryLessEquals, tbool)),
-      ((tint, tokenCombinedComparison, tint), (boundBinaryCompinedComparison,
-            tint)),
-
-      ((tbool, tokenAmpAmp, tbool), (boundBinaryLogicalAnd, tbool)),
-      ((tbool, tokenAnd, tbool), (boundBinaryLogicalAnd, tbool)),
-      ((tbool, tokenPipePipe, tbool), (boundBinaryLogicalOr, tbool)),
-      ((tbool, tokenOr, tbool), (boundBinaryLogicalOr, tbool)),
-      ((tbool, tokenCaret, tbool), (boundBinaryLogicalXor, tbool)),
-      ((tbool, tokenXor, tbool), (boundBinaryLogicalXor, tbool)),
-   ]
-   boundBinaryOperators: BoundBinaryOperators = boundBinaryOperatorList.toTable
-
-
-func getUnaryOperator(binder: Binder, token: Token,
-      dtype: Dtype): BoundUnaryOperatorResult =
-   if (token.kind, dtype) in boundUnaryOperators:
-      return boundUnaryOperators[(token.kind, dtype)]
-   elif dtype == terror: discard
-   else: binder.diagnostics.reportUndefinedUnaryOperator(token.pos, $token.kind, $dtype)
-
-func getBinaryOperator(binder: Binder, leftDtype: Dtype, token: Token,
-      rightDtype: Dtype): BoundBinaryOperatorResult =
-   if (leftDtype, token.kind, rightDtype) in boundBinaryOperators:
-      return boundBinaryOperators[(leftDtype, token.kind, rightDtype)]
-   elif terror in [leftDtype, rightDtype]: discard
-   else:
-      binder.diagnostics.reportUndefinedBinaryOperator(token.pos, $token.kind,
-            $leftDtype, $rightDtype)
 
 
 func `$`*(bound: Bound): string =
@@ -261,7 +159,7 @@ func bindIdentifierExpression(binder: Binder, node: Node): Bound =
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == unaryExpression
    let operand = binder.bindExpression(node.unaryOperand)
-   let (operatorKind, resultDtype) = binder.getUnaryOperator(node.unaryOperator, operand.dtype)
+   let (operatorKind, resultDtype) = getUnaryOperator(binder.diagnostics, node.unaryOperator, operand.dtype)
    return Bound(kind: boundUnaryExpression, unaryOperator: operatorKind,
          unaryOperand: operand, dtype: resultDtype)
 
@@ -269,7 +167,7 @@ func bindBinaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == binaryExpression
    let boundLeft = binder.bindExpression(node.left)
    let boundRight = binder.bindExpression(node.right)
-   let (operatorKind, resultDtype) = binder.getBinaryOperator(boundLeft.dtype,
+   let (operatorKind, resultDtype) = getBinaryOperator(binder.diagnostics, boundLeft.dtype,
          node.binaryOperator, boundRight.dtype)
    return Bound(kind: boundBinaryExpression, binaryLeft: boundLeft,
          binaryRight: boundRight, binaryOperator: operatorKind,
