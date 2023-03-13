@@ -28,10 +28,9 @@ type
 
    Identifier* = ref object
       name*: string
+      dtype*: Dtype
       declarationPos*: Position
       case kind*: IdentifierKind
-      of variableIdentifier:
-         dtype*: Dtype
       of functionIdentifier:
          retDtype*: Dtype
          parameters*: seq[Parameter]
@@ -71,5 +70,5 @@ func newVariableIdentifier*(name: string, dtype: Dtype, pos: Position): Identifi
 
 func newFunctionIdentifier*(name: string, retDtype: Dtype, parameters: seq[Parameter],
       pos: Position): Identifier =
-   return Identifier(kind: functionIdentifier, name: name, retDtype: retDtype,
+   return Identifier(kind: functionIdentifier, name: name, dtype: tvoid, retDtype: retDtype,
          parameters: parameters, declarationPos: pos)

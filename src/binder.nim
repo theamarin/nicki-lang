@@ -52,6 +52,7 @@ type
          defIdentifier*: Token
          defParameters*: seq[Parameter]
          defDtype*: Dtype
+         defValue*: Bound
       of boundConditionalExpression:
          conditionToken*: Token
          condition*: Bound # nil for "else"
@@ -167,6 +168,8 @@ func bindDefinitionExpression(binder: Binder, node: Node): Bound =
    result.defDtype = node.defDtype.text.toDtype
    if result.defDtype == terror:
       binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos, node.defDtype.text)
+   if node.defAssignExpression != nil:
+      result.defValue = binder.bindExpression(node.defAssignExpression)
    let identifier =
       if node.defParameterOpen != nil:
          newFunctionIdentifier(node.defIdentifier.text, result.defDtype, result.defParameters,
