@@ -165,11 +165,16 @@ func bindDefinitionExpression(binder: Binder, node: Node): Bound =
    result.defIdentifier = node.defIdentifier
    for parameter in node.defParameters:
       result.defParameters.add(binder.bindParameter(parameter))
-   result.defDtype = node.defDtype.text.toDtype
-   if result.defDtype == terror:
-      binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos, node.defDtype.text)
+   if node.defDtype != nil:
+      result.defDtype = node.defDtype.text.toDtype
+      if result.defDtype == terror:
+         binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos, node.defDtype.text)
    if node.defAssignExpression != nil:
       result.defValue = binder.bindExpression(node.defAssignExpression)
+      if node.defDtype != nil and result.defDtype != result.defValue.dtype:
+         binder.diagnostics.reportCannotCast(node.defAssignToken.pos, $result.defValue.dtype,
+               $result.defDtype)
+      if node.defDtype == nil: result.defDtype = result.defValue.dtype
    let identifier =
       if node.defParameterOpen != nil:
          newFunctionIdentifier(node.defIdentifier.text, result.defDtype, result.defParameters,

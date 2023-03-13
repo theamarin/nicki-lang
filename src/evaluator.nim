@@ -44,7 +44,7 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       self.variables[lvalue.text] = rvalue
       return rvalue
    of boundDefinitionExpression:
-      var value = Value(dtype: node.dtype)
+      var value = Value(dtype: node.defDtype)
       if node.defValue != nil:
          case node.defValue.dtype:
          of tint, tbool: value = self.evaluate(node.defValue)

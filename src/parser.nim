@@ -178,14 +178,22 @@ func parseDefinitionExpression(parser: var Parser): Node =
          result.defParameters.add(parser.parseParameterExpression(isFirst))
          isFirst = false
       result.defParameterClose = parser.matchToken(tokenParanthesisClose)
-   result.defColon = parser.matchToken(tokenColon)
-   result.defDtype = parser.matchToken(tokenIdentifier)
+      # Function definitions require return type specification
+      result.defColon = parser.matchToken(tokenColon)
+      result.defDtype = parser.matchToken(tokenIdentifier)
+   elif parser.current.kind == tokenColon:
+      # Variable definitios have optional type specification
+      result.defColon = parser.matchToken(tokenColon)
+      result.defDtype = parser.matchToken(tokenIdentifier)
    if parser.current.kind == tokenEquals:
       result.defAssignToken = parser.matchToken(tokenEquals)
       if result.defParameterClose != nil:
          result.defAssignExpression = parser.parseBlockExpression()
       else:
          result.defAssignExpression = parser.parseExpression()
+   if result.defColon == nil and result.defAssignToken == nil:
+      parser.diagnostics.reportIncompleteDefinition(result.defToken.pos, result.defIdentifier.text)
+
 
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:

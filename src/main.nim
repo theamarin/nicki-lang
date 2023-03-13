@@ -69,12 +69,14 @@ while true:
       parser.diagnostics.clear
       continue
 
+   let identifiersBackup = myBinder.scope.identifiers
    let bound = myBinder.bindExpression(parser.root)
    if showBind: echo $bound
    if myBinder.diagnostics.len > 0:
       for report in myBinder.diagnostics:
          writeLine(stdout, " ".repeat(report.pos.column+prompt.len) & "^  " & report.msg)
       myBinder.diagnostics.clear
+      myBinder.scope.identifiers = identifiersBackup # Reset scope on error
       continue
 
    let result = myEvaluator.evaluate(bound)

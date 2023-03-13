@@ -43,6 +43,9 @@ func reportUnexpectedToken*(self: var Diagnostics, pos: Position, actual: string
       expected: string) =
    self.report("Unexpected token " & escape(actual) & ", expected " & escape(expected), pos)
 
+func reportIncompleteDefinition*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Incomplete definition of " & escape(name) &
+         ", requires either data type or initial value", pos)
 
 # Binder
 func reportUndefinedUnaryOperator*(self: var Diagnostics, pos: Position, opKind: string,
