@@ -1,5 +1,5 @@
 import tables
-import lexer, dtype, diagnostics
+import lexer, identifiers, diagnostics
 
 type
    BoundUnaryOperatorKind* = enum

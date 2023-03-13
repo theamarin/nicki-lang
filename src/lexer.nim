@@ -1,5 +1,5 @@
 import strutils, strformat, tables
-import dtype, diagnostics
+import identifiers, diagnostics
 
 type
    TokenKind* = enum

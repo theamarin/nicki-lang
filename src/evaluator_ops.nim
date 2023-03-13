@@ -1,23 +1,4 @@
-import strutils
-
-type
-   Dtype* = enum
-      terror = "[error]"
-      tvoid = "void"
-      tbool = "bool"
-      tint = "int"
-      tstring = "string"
-
-   Value* = object
-      case dtype*: Dtype
-      of terror: discard
-      of tvoid: discard
-      of tbool: valBool*: bool
-      of tint: valInt*: int
-      of tstring: valString*: string
-
-func toDtype*(dtype: string): Dtype =
-   return parseEnum[Dtype](dtype)
+import strutils, identifiers
 
 func raiseUnexpectedDtypeException(dtype: Dtype, operation: string) =
    raise newException(ValueError, "Unexpected dtype " & escape($dtype) & " for " & operation)

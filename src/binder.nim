@@ -1,12 +1,7 @@
 import strutils, tables
-import parser, lexer, operators, dtype, diagnostics
+import parser, lexer, binder_ops, identifiers, diagnostics
 
 type
-   Identifier* = ref object
-      name*: string
-      dtype*: Dtype
-      declarationPos*: Position
-
    BoundScope* = ref object
       identifiers*: Table[string, Identifier]
       parent*: BoundScope
@@ -159,7 +154,8 @@ func bindIdentifierExpression(binder: Binder, node: Node): Bound =
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == unaryExpression
    let operand = binder.bindExpression(node.unaryOperand)
-   let (operatorKind, resultDtype) = getUnaryOperator(binder.diagnostics, node.unaryOperator, operand.dtype)
+   let (operatorKind, resultDtype) = getUnaryOperator(binder.diagnostics,
+         node.unaryOperator, operand.dtype)
    return Bound(kind: boundUnaryExpression, unaryOperator: operatorKind,
          unaryOperand: operand, dtype: resultDtype)
 
@@ -167,8 +163,8 @@ func bindBinaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == binaryExpression
    let boundLeft = binder.bindExpression(node.left)
    let boundRight = binder.bindExpression(node.right)
-   let (operatorKind, resultDtype) = getBinaryOperator(binder.diagnostics, boundLeft.dtype,
-         node.binaryOperator, boundRight.dtype)
+   let (operatorKind, resultDtype) = getBinaryOperator(binder.diagnostics,
+         boundLeft.dtype, node.binaryOperator, boundRight.dtype)
    return Bound(kind: boundBinaryExpression, binaryLeft: boundLeft,
          binaryRight: boundRight, binaryOperator: operatorKind,
          dtype: resultDtype)
@@ -181,7 +177,8 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
    if identifier == nil:
       binder.diagnostics.reportUndefinedIdentifier(node.lvalue.pos, node.lvalue.text)
    elif identifier.dtype != rvalue.dtype:
-      binder.diagnostics.reportCannotCast(node.assignment.pos, $rvalue.dtype, $identifier.dtype)
+      binder.diagnostics.reportCannotCast(node.assignment.pos, $rvalue.dtype,
+            $identifier.dtype)
    return Bound(kind: boundAssignmentExpression, dtype: rvalue.dtype,
          lvalue: node.lvalue, assignment: node.assignment, rvalue: rvalue)
 
@@ -189,10 +186,13 @@ func bindDefinitionExpression(binder: Binder, node: Node): Bound =
    assert node.kind == definitionExpression
    assert node.defToken.kind == tokenDef
    let dtype = node.defDtype.text.toDtype
-   if not binder.scope.tryDeclare(Identifier(name: node.defIdentifier.text, dtype: dtype)):
-      binder.diagnostics.reportAlreadyDeclaredIdentifier(node.defToken.pos, node.defToken.text)
+   if not binder.scope.tryDeclare(newVariableIdentifier(name = node.defIdentifier.text,
+         dtype = dtype, pos = node.defToken.pos)):
+      binder.diagnostics.reportAlreadyDeclaredIdentifier(node.defToken.pos,
+            node.defToken.text)
    return Bound(kind: boundDefinitionExpression, dtype: dtype, defToken: node.defToken,
-         defIdentifier: node.defIdentifier, defColon: node.defColon, defDtype: node.defDtype)
+         defIdentifier: node.defIdentifier, defColon: node.defColon,
+         defDtype: node.defDtype)
 
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
    assert node.kind == conditionalExpression

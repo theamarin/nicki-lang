@@ -1,5 +1,5 @@
 import strutils, tables, parseopt, os
-import parser, binder, evaluator, diagnostics
+import parser, binder, evaluator, diagnostics, identifiers
 
 var showTree = false
 var showBind = false
@@ -47,7 +47,7 @@ while true:
    if showVars:
       echo "Identifiers: "
       for name, identifier in myBinder.scope.identifiers:
-         echo " " & $name & ": " & $identifier.dtype
+         echo " " & $identifier
 
       echo "Variables: "
       for variable, value in myEvaluator.variables:
