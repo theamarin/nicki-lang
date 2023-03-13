@@ -71,11 +71,11 @@ type
       text*: string
 
 func prettyPrint*(key, value: string): string =
-   const align = 20
-   result = value
-   if value.len < align:
-      result &= " ".repeat(align - value.len)
-   result &= " " & key
+   const align = 16
+   result = key
+   if key.len < align:
+      result &= " ".repeat(align - key.len)
+   result &= " " & value
 
 func `$`*(token: Token): string =
    if token.isNil: return ""

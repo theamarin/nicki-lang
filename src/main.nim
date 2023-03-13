@@ -78,4 +78,4 @@ while true:
       continue
 
    let result = myEvaluator.evaluate(bound)
-   writeline(stdout, $result)
+   if result.dtype != tvoid: writeline(stdout, $result)

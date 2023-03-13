@@ -70,13 +70,15 @@ type
 
 
 func `$`*(bound: Bound): string =
+   if bound.isNil: return ""
    let intro = $bound.kind & ": "
    var children: seq[string]
    for key, value in fieldPairs(bound[]):
       when key == "kind": discard
       elif value is seq:
+         children.add(key)
          for x in value:
-            children.add($x)
+            children.add(indent($x, 3))
       else:
          children.add(prettyPrint(key, $value))
    return intro & "\p" & children.join("\p").indent(3)

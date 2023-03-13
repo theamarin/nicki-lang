@@ -28,11 +28,13 @@ type
          unaryOperator*: Token
          unaryOperand*: Node
       of binaryExpression:
-         left*, right*: Node
+         left*: Node
          binaryOperator*: Token
+         right*: Node
       of paranthesisExpression:
-         open*, close*: Token
+         open*: Token
          expression*: Node
+         close*: Token
       of parameterExpression:
          parameterSeparator*: Token
          parameterName*: Token
@@ -85,8 +87,9 @@ func `$`*(node: Node): string =
    for key, value in fieldPairs(node[]):
       when key == "kind": discard
       elif value is seq:
+         children.add(key)
          for x in value:
-            children.add($x)
+            children.add(indent($x, 3))
       else:
          children.add(prettyPrint(key, $value))
    return intro & "\p" & children.join("\p").indent(3)
