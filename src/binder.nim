@@ -165,8 +165,12 @@ func bindDefinitionExpression(binder: Binder, node: Node): Bound =
    result.defDtype = node.defDtype.text.toDtype
    if result.defDtype == terror:
       binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos, node.defDtype.text)
-   let identifier = newIdentifier(node.defIdentifier.text, result.defDtype, result.defParameters,
-         node.defToken.pos)
+   let identifier =
+      if node.defParameterOpen != nil:
+         newFunctionIdentifier(node.defIdentifier.text, result.defDtype, result.defParameters,
+            node.defToken.pos)
+      else:
+         newVariableIdentifier(node.defIdentifier.text, result.defDtype, node.defToken.pos)
    if not binder.scope.tryDeclare(identifier):
       binder.diagnostics.reportAlreadyDefinedIdentifier(node.defToken.pos, node.defToken.text)
 

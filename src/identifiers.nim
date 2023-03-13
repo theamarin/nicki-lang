@@ -60,16 +60,16 @@ func `$`*(identifier: Identifier): string =
    of functionIdentifier:
       result = identifier.name & "("
       result &= $(identifier.parameters).join(", ")
-      result = "): " & $identifier.retDtype
+      result &= "): " & $identifier.retDtype
    of dtypeIdentifier: discard
 
 func newDtypeIdentifier*(name: string, pos: Position): Identifier =
    return Identifier(kind: dtypeIdentifier, declarationPos: pos)
 
-func newIdentifier*(name: string, dtype: Dtype, parameters: seq[Parameter],
+func newVariableIdentifier*(name: string, dtype: Dtype, pos: Position): Identifier =
+   return Identifier(kind: variableIdentifier, name: name, dtype: dtype, declarationPos: pos)
+
+func newFunctionIdentifier*(name: string, retDtype: Dtype, parameters: seq[Parameter],
       pos: Position): Identifier =
-   if parameters.len > 0:
-      return Identifier(kind: functionIdentifier, name: name, retDtype: dtype,
-            parameters: parameters, declarationPos: pos)
-   else:
-      return Identifier(kind: variableIdentifier, name: name, dtype: dtype, declarationPos: pos)
+   return Identifier(kind: functionIdentifier, name: name, retDtype: retDtype,
+         parameters: parameters, declarationPos: pos)
