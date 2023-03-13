@@ -11,6 +11,7 @@ type
       unaryExpression = "unary expression"
       binaryExpression = "binary expression"
       paranthesisExpression = "paranthesis expression"
+      parameterExpression = "parameter expression"
       definitionExpression = "definition expression"
       assignmentExpression = "assignment expression"
       conditionalExpression = "conditional expression"
@@ -32,9 +33,16 @@ type
       of paranthesisExpression:
          open*, close*: Token
          expression*: Node
+      of parameterExpression:
+         parameterOpenParan*: Token
+         parameterName*: Node
+         parameterColon*: Token
+         parameterDtype*: Node
+         parameterCommaOrClose*: Token
       of definitionExpression:
          defToken*: Token
          defIdentifier*: Token
+         defParameters*: seq[Node] # parameterExpressions
          defColon*: Token
          defDtype*: Token
       of assignmentExpression:
@@ -42,10 +50,10 @@ type
          rvalue*: Node
       of conditionalExpression:
          conditionToken*: Token
-         condition*: Node # nil for "else"
+         condition*: Node          # nil for "else"
          colonToken*: Token
          conditional*: Node
-         otherwise*: Node # if "elif" or "else" is present
+         otherwise*: Node          # if "elif" or "else" is present
       of whileExpression:
          whileToken*: Token
          whileCondition*: Node
@@ -68,49 +76,59 @@ type
 
 
 func `$`*(node: Node): string =
-   result = $node.kind & ": "
+   let intro = $node.kind & ": "
+   var children: seq[string]
    case node.kind
-   of errorExpression: result &= $node.errorToken
-   of literalExpression: result &= $node.literal
-   of identifierExpression: result &= $node.identifier
+   of errorExpression: return intro & $node.errorToken
+   of literalExpression: return intro & $node.literal
+   of identifierExpression: return intro & $node.identifier
    of unaryExpression:
-      result &= "\p" & indent($node.unaryOperator, 3)
-      result &= "\p" & indent($node.unaryOperand, 3)
+      children.add($node.unaryOperator)
+      children.add($node.unaryOperand)
    of binaryExpression:
-      result &= "\p" & indent($node.left, 3)
-      result &= "\p" & indent($node.binaryOperator, 3)
-      result &= "\p" & indent($node.right, 3)
+      children.add($node.left)
+      children.add($node.binaryOperator)
+      children.add($node.right)
    of paranthesisExpression:
-      result &= "\p" & indent($node.open, 3)
-      result &= "\p" & indent($node.expression, 3)
-      result &= "\p" & indent($node.close, 3)
+      children.add($node.open)
+      children.add($node.expression)
+      children.add($node.close)
+   of parameterExpression:
+      children.add($node.parameterOpenParan)
+      children.add($node.parameterName)
+      children.add($node.parameterColon)
+      children.add($node.parameterDtype)
+      children.add($node.parameterCommaOrClose)
    of definitionExpression:
-      result &= "\p" & indent($node.defToken, 3)
-      result &= "\p" & indent($node.defIdentifier, 3)
-      result &= "\p" & indent($node.defColon, 3)
-      result &= "\p" & indent($node.defDtype, 3)
+      children.add($node.defToken)
+      children.add($node.defIdentifier)
+      for parameter in node.defParameters:
+         children.add($parameter)
+      children.add($node.defColon)
+      children.add($node.defDtype)
    of assignmentExpression:
-      result &= "\p" & indent($node.lvalue, 3)
-      result &= "\p" & indent($node.assignment, 3)
-      result &= "\p" & indent($node.rvalue, 3)
+      children.add($node.lvalue)
+      children.add($node.assignment)
+      children.add($node.rvalue)
    of conditionalExpression:
-      result &= "\p" & indent($node.conditionToken, 3)
+      children.add($node.conditionToken)
       if node.condition != nil:
-         result &= "\p" & indent($node.condition, 3)
-      result &= "\p" & indent($node.conditional, 3)
+         children.add($node.condition)
+      children.add($node.conditional)
       if node.otherwise != nil:
-         result &= "\p" & indent($node.otherwise, 3)
+         children.add($node.otherwise)
    of whileExpression:
-      result &= "\p" & indent($node.whileToken, 3)
-      result &= "\p" & indent($node.whileCondition, 3)
-      result &= "\p" & indent($node.whileColon, 3)
-      result &= "\p" & indent($node.whileBody, 3)
+      children.add($node.whileToken)
+      children.add($node.whileCondition)
+      children.add($node.whileColon)
+      children.add($node.whileBody)
    of blockExpression:
       for expression in node.blockExpressions:
-         result &= "\p" & indent($expression, 3)
+         children.add($expression)
    of compilationUnit:
-      result &= "\p" & indent($node.root, 3)
-      result &= "\p" & indent($node.eofToken, 3)
+      children.add($node.root)
+      children.add($node.eofToken)
+   return intro & "\p" & children.join("\p").indent(3)
 
 func peek(parser: Parser, offset: int = 0): Token =
    return parser.lexer.get(parser.pos + offset)

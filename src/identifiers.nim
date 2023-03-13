@@ -22,7 +22,7 @@ type
       dtype: Dtype
 
    IdentifierKind* = enum
-      typeIdentifier,
+      dtypeIdentifier,
       variableIdentifier,
       functionIdentifier
 
@@ -50,8 +50,10 @@ func `$`*(identifier: Identifier): string =
       result = identifier.name & "("
       result &= $(identifier.parameters).join(", ")
       result = "): " & $identifier.retDtype
-   of typeIdentifier: discard
+   of dtypeIdentifier: discard
 
+func newDtypeIdentifier*(name: string, pos: Position): Identifier =
+   return Identifier(kind: dtypeIdentifier, declarationPos: pos)
 
 func newVariableIdentifier*(name: string, dtype: Dtype, pos: Position): Identifier =
    return Identifier(kind: variableIdentifier, name: name, dtype: dtype,

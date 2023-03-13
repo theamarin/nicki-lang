@@ -1,4 +1,4 @@
-import strutils, strformat, tables
+import strutils, tables
 import identifiers, diagnostics
 
 type
@@ -23,6 +23,7 @@ type
       tokenFor = "for"
       tokenWhile = "while"
       tokenDef = "def"
+      tokenType = "type"
       tokenConst = "const"
       tokenPublic = "public"
       tokenObject = "object"
@@ -71,8 +72,9 @@ type
 
 func `$`*(token: Token): string =
    if token.isNil: return "nil"
-   result = fmt"{$token.kind} @ {$token.pos}"
-   if $token.kind != token.text: result &= " ({escape(token.text)})"
+   result &= token.text
+   if $token.kind != token.text: result &= " " & $token.kind
+   result &= " @ " & $token.pos
 
 type
    Lexer* = ref object
@@ -101,6 +103,7 @@ const
       ("for", tokenFor),
       ("while", tokenWhile),
       ("def", tokenDef),
+      ("type", tokenType),
       ("const", tokenConst),
       ("public", tokenPublic),
       ("object", tokenObject),

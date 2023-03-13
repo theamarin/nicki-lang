@@ -24,6 +24,7 @@ type
       boundUnaryExpression = "unary expression"
       boundBinaryExpression = "binary expression"
       boundAssignmentExpression = "assignment expression"
+      boundParameterExpression = "parameter expression"
       boundDefinitionExpression = "definition expression"
       boundConditionalExpression = "conditional expression"
       boundWhileExpression = "while expression"
@@ -49,6 +50,8 @@ type
          lvalue*: Token
          assignment*: Token
          rvalue*: Bound
+      of boundParameterExpression:
+         parameterName*: Node
       of boundDefinitionExpression:
          defToken*: Token
          defIdentifier*: Token
@@ -77,43 +80,47 @@ type
 
 
 func `$`*(bound: Bound): string =
-   result = $bound.kind & ": "
+   let intro = $bound.kind & ": "
+   var children: seq[string]
    case bound.kind
-   of bounderror: result &= $bound.errorToken
-   of boundLiteralExpression: result &= $bound.value
+   of bounderror: return intro & $bound.errorToken
+   of boundLiteralExpression: return intro & $bound.value
    of boundIdentifierExpression:
-      result &= bound.identifier.name & " of " & $bound.identifier.dtype
+      return intro & bound.identifier.name & " of " & $bound.identifier.dtype
    of boundUnaryExpression:
-      result &= "\p" & indent($bound.unaryOperator, 3)
-      result &= "\p" & indent($bound.unaryOperand, 3)
+      children.add($bound.unaryOperator)
+      children.add($bound.unaryOperand)
    of boundBinaryExpression:
-      result &= "\p" & indent($bound.binaryLeft, 3)
-      result &= "\p" & indent($bound.binaryOperator, 3)
-      result &= "\p" & indent($bound.binaryRight, 3)
+      children.add($bound.binaryLeft)
+      children.add($bound.binaryOperator)
+      children.add($bound.binaryRight)
    of boundAssignmentExpression:
-      result &= "\p" & indent($bound.lvalue, 3)
-      result &= "\p" & indent($bound.assignment, 3)
-      result &= "\p" & indent($bound.rvalue, 3)
+      children.add($bound.lvalue)
+      children.add($bound.assignment)
+      children.add($bound.rvalue)
+   of boundParameterExpression:
+      children.add($bound.parameterName)
    of boundDefinitionExpression:
-      result &= "\p" & indent($bound.defToken, 3)
-      result &= "\p" & indent($bound.defIdentifier, 3)
-      result &= "\p" & indent($bound.defColon, 3)
-      result &= "\p" & indent($bound.defDtype, 3)
+      children.add($bound.defToken)
+      children.add($bound.defIdentifier)
+      children.add($bound.defColon)
+      children.add($bound.defDtype)
    of boundConditionalExpression:
-      result &= "\p" & indent($bound.conditionToken, 3)
+      children.add($bound.conditionToken)
       if bound.condition != nil:
-         result &= "\p" & indent($bound.condition, 3)
-      result &= "\p" & indent($bound.conditional, 3)
+         children.add($bound.condition)
+      children.add($bound.conditional)
       if bound.otherwise != nil:
-         result &= "\p" & indent($bound.otherwise, 3)
+         children.add($bound.otherwise)
    of boundWhileExpression:
-      result &= "\p" & indent($bound.whileToken, 3)
-      result &= "\p" & indent($bound.whileCondition, 3)
-      result &= "\p" & indent($bound.whileColon, 3)
-      result &= "\p" & indent($bound.whileBody, 3)
+      children.add($bound.whileToken)
+      children.add($bound.whileCondition)
+      children.add($bound.whileColon)
+      children.add($bound.whileBody)
    of boundBlockExpression:
       for expression in bound.blockExpressions:
-         result &= "\p" & indent($expression, 3)
+         children.add($expression)
+   return intro & "\p" & children.join("\p").indent(3)
 
 
 func bindExpression*(binder: Binder, node: Node): Bound
@@ -181,6 +188,12 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
             $identifier.dtype)
    return Bound(kind: boundAssignmentExpression, dtype: rvalue.dtype,
          lvalue: node.lvalue, assignment: node.assignment, rvalue: rvalue)
+
+func bindParameterExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == parameterExpression
+   let paramName = node.parameterName
+   let dtype = node.parameterDtype.literal.text.toDtype
+   return Bound(kind: boundParameterExpression, dtype: dtype, parameterName: paramName)
 
 func bindDefinitionExpression(binder: Binder, node: Node): Bound =
    assert node.kind == definitionExpression
@@ -253,6 +266,8 @@ func bindExpression*(binder: Binder, node: Node): Bound =
       return binder.bindExpression(node.expression)
    of assignmentExpression:
       return binder.bindAssignmentExpression(node)
+   of parameterExpression:
+      return binder.bindParameterExpression(node)
    of definitionExpression:
       return binder.bindDefinitionExpression(node)
    of conditionalExpression:
