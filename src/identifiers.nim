@@ -40,6 +40,14 @@ type
 func toDtype*(dtype: string): Dtype =
    return parseEnum[Dtype](dtype)
 
+func `$`*(val: Value): string =
+   case val.dtype
+   of terror: return "[error]"
+   of tvoid: return "[void]"
+   of tbool: return $val.valBool
+   of tint: return $val.valInt
+   of tstring: return $val.valString
+
 func `$`*(parameter: Parameter): string =
    return parameter.name & ": " & $parameter.dtype
 

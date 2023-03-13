@@ -3,9 +3,9 @@ import lexer, identifiers, diagnostics
 
 type
    BoundUnaryOperatorKind* = enum
-      boundUnaryPlus
-      boundUnaryMinus
-      boundUnaryNot
+      boundUnaryPlus = "identity"
+      boundUnaryMinus = "negative"
+      boundUnaryNot = "negation"
 
    BoundUnaryOperatorMatch = tuple
       tokenKind: TokenKind
@@ -19,20 +19,20 @@ type
    BoundUnaryOperators = Table[BoundUnaryOperatorMatch, BoundUnaryOperatorResult]
 
    BoundBinaryOperatorKind* = enum
-      boundBinaryAddition,
-      boundBinarySubtraction,
-      boundBinaryMultiplication,
-      boundBinaryDivision,
-      boundBinaryEquals,
-      boundBinaryNotEquals,
-      boundBinaryGreaterThan,
-      boundBinaryGreaterEquals,
-      boundBinaryLessThan,
-      boundBinaryLessEquals,
-      boundBinaryCompinedComparison,
-      boundBinaryLogicalAnd,
-      boundBinaryLogicalOr
-      boundBinaryLogicalXor
+      boundBinaryAddition = "addition",
+      boundBinarySubtraction = "subtraction",
+      boundBinaryMultiplication = "multiplication",
+      boundBinaryDivision = "division",
+      boundBinaryEquals = "equals",
+      boundBinaryNotEquals = "not equals",
+      boundBinaryGreaterThan = "greater than",
+      boundBinaryGreaterEquals = "greater equals",
+      boundBinaryLessThan = "less than",
+      boundBinaryLessEquals = "less or equals",
+      boundBinaryCompinedComparison = "combined comparison",
+      boundBinaryLogicalAnd = "logical and",
+      boundBinaryLogicalOr = "logical or"
+      boundBinaryLogicalXor = "logical xor"
 
    BoundBinaryOperatorMatch = tuple
       leftDtype: Dtype

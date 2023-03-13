@@ -5,14 +5,6 @@ type
    Evaluator* = ref object
       variables*: Table[string, Value]
 
-func `$`*(val: Value): string =
-   case val.dtype
-   of terror: return "[error]"
-   of tvoid: return "[void]"
-   of tbool: return $val.valBool
-   of tint: return $val.valInt
-   of tstring: return $val.valString
-
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
    of boundError: return Value(dtype: terror)

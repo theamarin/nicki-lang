@@ -48,30 +48,22 @@ type
          binaryRight*: Bound
       of boundAssignmentExpression:
          lvalue*: Token
-         assignment*: Token
          rvalue*: Bound
       of boundParameterExpression:
          parameterName*: Node
       of boundDefinitionExpression:
-         defToken*: Token
          defIdentifier*: Token
-         defColon*: Token
          defDtype*: Token
       of boundConditionalExpression:
          conditionToken*: Token
          condition*: Bound # nil for "else"
-         colonToken*: Token
          conditional*: Bound
          otherwise*: Bound # if "elif" or "else" is present
       of boundWhileExpression:
-         whileToken*: Token
          whileCondition*: Bound
-         whileColon*: Token
          whileBody*: Bound
       of boundBlockExpression:
-         blockStart*: Token
          blockExpressions*: seq[Bound]
-         blockEnd*: Token
 
    Binder* = ref object
       root*: Bound
@@ -96,14 +88,11 @@ func `$`*(bound: Bound): string =
       children.add($bound.binaryRight)
    of boundAssignmentExpression:
       children.add($bound.lvalue)
-      children.add($bound.assignment)
       children.add($bound.rvalue)
    of boundParameterExpression:
       children.add($bound.parameterName)
    of boundDefinitionExpression:
-      children.add($bound.defToken)
       children.add($bound.defIdentifier)
-      children.add($bound.defColon)
       children.add($bound.defDtype)
    of boundConditionalExpression:
       children.add($bound.conditionToken)
@@ -113,9 +102,7 @@ func `$`*(bound: Bound): string =
       if bound.otherwise != nil:
          children.add($bound.otherwise)
    of boundWhileExpression:
-      children.add($bound.whileToken)
       children.add($bound.whileCondition)
-      children.add($bound.whileColon)
       children.add($bound.whileBody)
    of boundBlockExpression:
       for expression in bound.blockExpressions:
@@ -187,7 +174,7 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
       binder.diagnostics.reportCannotCast(node.assignment.pos, $rvalue.dtype,
             $identifier.dtype)
    return Bound(kind: boundAssignmentExpression, dtype: rvalue.dtype,
-         lvalue: node.lvalue, assignment: node.assignment, rvalue: rvalue)
+         lvalue: node.lvalue, rvalue: rvalue)
 
 func bindParameterExpression(binder: Binder, node: Node): Bound =
    assert node.kind == parameterExpression
@@ -203,8 +190,7 @@ func bindDefinitionExpression(binder: Binder, node: Node): Bound =
          dtype = dtype, pos = node.defToken.pos)):
       binder.diagnostics.reportAlreadyDeclaredIdentifier(node.defToken.pos,
             node.defToken.text)
-   return Bound(kind: boundDefinitionExpression, dtype: dtype, defToken: node.defToken,
-         defIdentifier: node.defIdentifier, defColon: node.defColon,
+   return Bound(kind: boundDefinitionExpression, dtype: dtype, defIdentifier: node.defIdentifier,
          defDtype: node.defDtype)
 
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
@@ -229,15 +215,13 @@ func bindConditionalExpression(binder: Binder, node: Node): Bound =
                $otherwise.conditionToken.text, $otherwise.dtype)
    return Bound(kind: boundConditionalExpression, dtype: conditional.dtype,
          conditionToken: node.conditionToken, condition: condition,
-         colonToken: node.colonToken, conditional: conditional,
-         otherwise: otherwise)
+         conditional: conditional, otherwise: otherwise)
 
 func bindWhileExpression(binder: Binder, node: Node): Bound =
    assert node.kind == whileExpression
    let whileCondition = binder.bindExpression(node.whileCondition)
    let whileBody = binder.bindExpression(node.whileBody)
-   return Bound(kind: boundWhileExpression, dtype: tvoid, whileToken: node.whileToken,
-         whileCondition: whileCondition, whileColon: node.whileColon,
+   return Bound(kind: boundWhileExpression, dtype: tvoid, whileCondition: whileCondition,
          whileBody: whileBody)
 
 func bindBlockExpression(binder: Binder, node: Node): Bound =
@@ -245,9 +229,7 @@ func bindBlockExpression(binder: Binder, node: Node): Bound =
    var blockExpressions: seq[Bound]
    for expression in node.blockExpressions:
       blockExpressions.add(binder.bindExpression(expression))
-   return Bound(kind: boundBlockExpression, dtype: tvoid,
-         blockStart: node.blockStart, blockExpressions: blockExpressions,
-         blockEnd: node.blockEnd)
+   return Bound(kind: boundBlockExpression, dtype: tvoid, blockExpressions: blockExpressions)
 
 
 func bindExpression*(binder: Binder, node: Node): Bound =
