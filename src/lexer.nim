@@ -70,11 +70,17 @@ type
       pos*: Position
       text*: string
 
+func prettyPrint*(key, value: string): string =
+   const align = 20
+   result = value
+   if value.len < align:
+      result &= " ".repeat(align - value.len)
+   result &= " " & key
+
 func `$`*(token: Token): string =
-   if token.isNil: return "nil"
+   if token.isNil: return ""
    result &= token.text
    if $token.kind != token.text: result &= " " & $token.kind
-   result &= " @ " & $token.pos
 
 type
    Lexer* = ref object

@@ -34,26 +34,29 @@ type
          open*, close*: Token
          expression*: Node
       of parameterExpression:
-         parameterStart*: Token
+         parameterSeparator*: Token
          parameterName*: Token
          parameterColon*: Token
          parameterDtype*: Token
       of definitionExpression:
          defToken*: Token
          defIdentifier*: Token
-         defParameters*: seq[Node] # parameterExpressions
+         defParameterOpen*: Token
+         defParameters*: seq[Node]
          defParameterClose*: Token
          defColon*: Token
          defDtype*: Token
+         defAssignToken*: Token
+         defAssignExpression*: Node
       of assignmentExpression:
          lvalue*, assignment*: Token
          rvalue*: Node
       of conditionalExpression:
          conditionToken*: Token
-         condition*: Node          # nil for "else"
+         condition*: Node # nil for "else"
          colonToken*: Token
          conditional*: Node
-         otherwise*: Node          # if "elif" or "else" is present
+         otherwise*: Node # if "elif" or "else" is present
       of whileExpression:
          whileToken*: Token
          whileCondition*: Node
@@ -76,58 +79,16 @@ type
 
 
 func `$`*(node: Node): string =
+   if node.isNil: return ""
    let intro = $node.kind & ": "
    var children: seq[string]
-   case node.kind
-   of errorExpression: return intro & $node.errorToken
-   of literalExpression: return intro & $node.literal
-   of identifierExpression: return intro & $node.identifier
-   of unaryExpression:
-      children.add($node.unaryOperator)
-      children.add($node.unaryOperand)
-   of binaryExpression:
-      children.add($node.left)
-      children.add($node.binaryOperator)
-      children.add($node.right)
-   of paranthesisExpression:
-      children.add($node.open)
-      children.add($node.expression)
-      children.add($node.close)
-   of parameterExpression:
-      children.add($node.parameterStart)
-      children.add($node.parameterName)
-      children.add($node.parameterColon)
-      children.add($node.parameterDtype)
-   of definitionExpression:
-      children.add($node.defToken)
-      children.add($node.defIdentifier)
-      for parameter in node.defParameters:
-         children.add($parameter)
-      children.add($node.defParameterClose)
-      children.add($node.defColon)
-      children.add($node.defDtype)
-   of assignmentExpression:
-      children.add($node.lvalue)
-      children.add($node.assignment)
-      children.add($node.rvalue)
-   of conditionalExpression:
-      children.add($node.conditionToken)
-      if node.condition != nil:
-         children.add($node.condition)
-      children.add($node.conditional)
-      if node.otherwise != nil:
-         children.add($node.otherwise)
-   of whileExpression:
-      children.add($node.whileToken)
-      children.add($node.whileCondition)
-      children.add($node.whileColon)
-      children.add($node.whileBody)
-   of blockExpression:
-      for expression in node.blockExpressions:
-         children.add($expression)
-   of compilationUnit:
-      children.add($node.root)
-      children.add($node.eofToken)
+   for key, value in fieldPairs(node[]):
+      when key == "kind": discard
+      elif value is seq:
+         for x in value:
+            children.add($x)
+      else:
+         children.add(prettyPrint(key, $value))
    return intro & "\p" & children.join("\p").indent(3)
 
 func peek(parser: Parser, offset: int = 0): Token =
@@ -195,9 +156,10 @@ func parseBlockExpression(parser: var Parser): Node =
    return Node(kind: blockExpression, blockStart: blockStart,
          blockExpressions: blockExpressions, blockEnd: blockEnd)
 
-func parseParameterExpression(parser: var Parser): Node =
+func parseParameterExpression(parser: var Parser, isFirst: bool): Node =
    result = Node(kind: parameterExpression)
-   result.parameterStart = parser.matchToken({tokenParanthesisOpen, tokenComma})
+   if not isFirst:
+      result.parameterSeparator = parser.matchToken(tokenComma)
    result.parameterName = parser.matchToken(tokenIdentifier)
    result.parameterColon = parser.matchToken(tokenColon)
    result.parameterDtype = parser.matchToken(tokenIdentifier)
@@ -207,11 +169,20 @@ func parseDefinitionExpression(parser: var Parser): Node =
    result.defToken = parser.matchToken(tokenDef)
    result.defIdentifier = parser.matchToken(tokenIdentifier)
    if parser.current.kind == tokenParanthesisOpen:
-      while parser.current.kind in {tokenParanthesisOpen, tokenComma}:
-         result.defParameters.add(parser.parseParameterExpression())
+      result.defParameterOpen = parser.matchToken(tokenParanthesisOpen)
+      var isFirst = true
+      while parser.current.kind in {tokenIdentifier, tokenComma}:
+         result.defParameters.add(parser.parseParameterExpression(isFirst))
+         isFirst = false
       result.defParameterClose = parser.matchToken(tokenParanthesisClose)
    result.defColon = parser.matchToken(tokenColon)
    result.defDtype = parser.matchToken(tokenIdentifier)
+   if parser.current.kind == tokenEquals:
+      result.defAssignToken = parser.matchToken(tokenEquals)
+      if result.defParameterClose != nil:
+         result.defAssignExpression = parser.parseBlockExpression()
+      else:
+         result.defAssignExpression = parser.parseExpression()
 
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:

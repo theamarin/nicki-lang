@@ -72,39 +72,13 @@ type
 func `$`*(bound: Bound): string =
    let intro = $bound.kind & ": "
    var children: seq[string]
-   case bound.kind
-   of bounderror: return intro & $bound.errorToken
-   of boundLiteralExpression: return intro & $bound.value
-   of boundIdentifierExpression:
-      return intro & bound.identifier.name & " of " & $bound.identifier.dtype
-   of boundUnaryExpression:
-      children.add($bound.unaryOperator)
-      children.add($bound.unaryOperand)
-   of boundBinaryExpression:
-      children.add($bound.binaryLeft)
-      children.add($bound.binaryOperator)
-      children.add($bound.binaryRight)
-   of boundAssignmentExpression:
-      children.add($bound.lvalue)
-      children.add($bound.rvalue)
-   of boundDefinitionExpression:
-      children.add($bound.defIdentifier)
-      for parameter in bound.defParameters:
-         children.add($parameter)
-      children.add($bound.defDtype)
-   of boundConditionalExpression:
-      children.add($bound.conditionToken)
-      if bound.condition != nil:
-         children.add($bound.condition)
-      children.add($bound.conditional)
-      if bound.otherwise != nil:
-         children.add($bound.otherwise)
-   of boundWhileExpression:
-      children.add($bound.whileCondition)
-      children.add($bound.whileBody)
-   of boundBlockExpression:
-      for expression in bound.blockExpressions:
-         children.add($expression)
+   for key, value in fieldPairs(bound[]):
+      when key == "kind": discard
+      elif value is seq:
+         for x in value:
+            children.add($x)
+      else:
+         children.add(prettyPrint(key, $value))
    return intro & "\p" & children.join("\p").indent(3)
 
 
