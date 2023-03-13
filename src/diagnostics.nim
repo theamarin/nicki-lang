@@ -58,8 +58,8 @@ func reportUndefinedBinaryOperator*(self: var Diagnostics, pos: Position,
 func reportUndefinedIdentifier*(self: var Diagnostics, pos: Position, name: string) =
    self.report("Undefined identifier " & escape(name), pos)
 
-func reportAlreadyDeclaredIdentifier*(self: var Diagnostics, pos: Position, name: string) =
-   self.report("Identifier " & escape(name) & " already declared", pos)
+func reportAlreadyDefinedIdentifier*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Identifier " & escape(name) & " already defined", pos)
 
 func reportCannotCast*(self: var Diagnostics, pos: Position, dtypeFrom: string, dtypeTo: string) =
    self.report("Cannot cast " & escape(dtypeFrom) & " to data type " & escape(dtypeTo), pos)

@@ -24,7 +24,6 @@ type
       boundUnaryExpression = "unary expression"
       boundBinaryExpression = "binary expression"
       boundAssignmentExpression = "assignment expression"
-      boundParameterExpression = "parameter expression"
       boundDefinitionExpression = "definition expression"
       boundConditionalExpression = "conditional expression"
       boundWhileExpression = "while expression"
@@ -49,11 +48,10 @@ type
       of boundAssignmentExpression:
          lvalue*: Token
          rvalue*: Bound
-      of boundParameterExpression:
-         parameterName*: Node
       of boundDefinitionExpression:
          defIdentifier*: Token
-         defDtype*: Token
+         defParameters*: seq[Parameter]
+         defDtype*: Dtype
       of boundConditionalExpression:
          conditionToken*: Token
          condition*: Bound # nil for "else"
@@ -89,10 +87,10 @@ func `$`*(bound: Bound): string =
    of boundAssignmentExpression:
       children.add($bound.lvalue)
       children.add($bound.rvalue)
-   of boundParameterExpression:
-      children.add($bound.parameterName)
    of boundDefinitionExpression:
       children.add($bound.defIdentifier)
+      for parameter in bound.defParameters:
+         children.add($parameter)
       children.add($bound.defDtype)
    of boundConditionalExpression:
       children.add($bound.conditionToken)
@@ -135,15 +133,14 @@ func bindLiteralExpression(binder: Binder, node: Node): Bound =
 func bindIdentifierExpression(binder: Binder, node: Node): Bound =
    assert node.kind == identifierExpression
    assert node.identifier.kind == tokenIdentifier
+   result = Bound(kind: boundIdentifierExpression)
    let name = node.identifier.text
-   let identifier = binder.scope.tryLookup(name)
-   var dtype: Dtype
-   if identifier != nil: dtype = identifier.dtype
+   result.identifier = binder.scope.tryLookup(name)
+   if result.identifier != nil:
+      result.dtype = result.identifier.dtype
    else:
       binder.diagnostics.reportUndefinedIdentifier(node.identifier.pos, name)
-      dtype = terror
-   return Bound(kind: boundIdentifierExpression, dtype: dtype,
-         identifier: identifier)
+      result.dtype = terror
 
 func bindUnaryExpression(binder: Binder, node: Node): Bound =
    assert node.kind == unaryExpression
@@ -176,22 +173,28 @@ func bindAssignmentExpression(binder: Binder, node: Node): Bound =
    return Bound(kind: boundAssignmentExpression, dtype: rvalue.dtype,
          lvalue: node.lvalue, rvalue: rvalue)
 
-func bindParameterExpression(binder: Binder, node: Node): Bound =
+func bindParameter(binder: Binder, node: Node): Parameter =
    assert node.kind == parameterExpression
-   let paramName = node.parameterName
-   let dtype = node.parameterDtype.literal.text.toDtype
-   return Bound(kind: boundParameterExpression, dtype: dtype, parameterName: paramName)
+   result.name = node.parameterName.text
+   result.dtype = node.parameterDtype.text.toDtype
+   if result.dtype == terror:
+      binder.diagnostics.reportUndefinedIdentifier(node.parameterDtype.pos,
+            node.parameterDtype.text)
 
 func bindDefinitionExpression(binder: Binder, node: Node): Bound =
    assert node.kind == definitionExpression
-   assert node.defToken.kind == tokenDef
-   let dtype = node.defDtype.text.toDtype
-   if not binder.scope.tryDeclare(newVariableIdentifier(name = node.defIdentifier.text,
-         dtype = dtype, pos = node.defToken.pos)):
-      binder.diagnostics.reportAlreadyDeclaredIdentifier(node.defToken.pos,
-            node.defToken.text)
-   return Bound(kind: boundDefinitionExpression, dtype: dtype, defIdentifier: node.defIdentifier,
-         defDtype: node.defDtype)
+   result = Bound(kind: boundDefinitionExpression)
+   result.dtype = tvoid
+   result.defIdentifier = node.defIdentifier
+   for parameter in node.defParameters:
+      result.defParameters.add(binder.bindParameter(parameter))
+   result.defDtype = node.defDtype.text.toDtype
+   if result.defDtype == terror:
+      binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos, node.defDtype.text)
+   let identifier = newIdentifier(node.defIdentifier.text, result.defDtype, result.defParameters,
+         node.defToken.pos)
+   if not binder.scope.tryDeclare(identifier):
+      binder.diagnostics.reportAlreadyDefinedIdentifier(node.defToken.pos, node.defToken.text)
 
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
    assert node.kind == conditionalExpression
@@ -249,7 +252,7 @@ func bindExpression*(binder: Binder, node: Node): Bound =
    of assignmentExpression:
       return binder.bindAssignmentExpression(node)
    of parameterExpression:
-      return binder.bindParameterExpression(node)
+      raise (ref Exception)(msg: "Unexpected parameter expression")
    of definitionExpression:
       return binder.bindDefinitionExpression(node)
    of conditionalExpression:

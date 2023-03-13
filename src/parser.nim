@@ -34,15 +34,15 @@ type
          open*, close*: Token
          expression*: Node
       of parameterExpression:
-         parameterOpenParan*: Token
-         parameterName*: Node
+         parameterStart*: Token
+         parameterName*: Token
          parameterColon*: Token
-         parameterDtype*: Node
-         parameterCommaOrClose*: Token
+         parameterDtype*: Token
       of definitionExpression:
          defToken*: Token
          defIdentifier*: Token
          defParameters*: seq[Node] # parameterExpressions
+         defParameterClose*: Token
          defColon*: Token
          defDtype*: Token
       of assignmentExpression:
@@ -94,16 +94,16 @@ func `$`*(node: Node): string =
       children.add($node.expression)
       children.add($node.close)
    of parameterExpression:
-      children.add($node.parameterOpenParan)
+      children.add($node.parameterStart)
       children.add($node.parameterName)
       children.add($node.parameterColon)
       children.add($node.parameterDtype)
-      children.add($node.parameterCommaOrClose)
    of definitionExpression:
       children.add($node.defToken)
       children.add($node.defIdentifier)
       for parameter in node.defParameters:
          children.add($parameter)
+      children.add($node.defParameterClose)
       children.add($node.defColon)
       children.add($node.defDtype)
    of assignmentExpression:
@@ -195,13 +195,23 @@ func parseBlockExpression(parser: var Parser): Node =
    return Node(kind: blockExpression, blockStart: blockStart,
          blockExpressions: blockExpressions, blockEnd: blockEnd)
 
+func parseParameterExpression(parser: var Parser): Node =
+   result = Node(kind: parameterExpression)
+   result.parameterStart = parser.matchToken({tokenParanthesisOpen, tokenComma})
+   result.parameterName = parser.matchToken(tokenIdentifier)
+   result.parameterColon = parser.matchToken(tokenColon)
+   result.parameterDtype = parser.matchToken(tokenIdentifier)
+
 func parseDefinitionExpression(parser: var Parser): Node =
-   let defToken = parser.matchToken(tokenDef)
-   let defIdentifier = parser.matchToken(tokenIdentifier)
-   let defColon = parser.matchToken(tokenColon)
-   let defDtype = parser.matchToken(tokenIdentifier)
-   return Node(kind: definitionExpression, defToken: defToken, defIdentifier: defIdentifier,
-         defColon: defColon, defDtype: defDtype)
+   result = Node(kind: definitionExpression)
+   result.defToken = parser.matchToken(tokenDef)
+   result.defIdentifier = parser.matchToken(tokenIdentifier)
+   if parser.current.kind == tokenParanthesisOpen:
+      while parser.current.kind in {tokenParanthesisOpen, tokenComma}:
+         result.defParameters.add(parser.parseParameterExpression())
+      result.defParameterClose = parser.matchToken(tokenParanthesisClose)
+   result.defColon = parser.matchToken(tokenColon)
+   result.defDtype = parser.matchToken(tokenIdentifier)
 
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:
