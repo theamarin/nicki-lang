@@ -91,6 +91,12 @@ type
       root*: Node
       diagnostics*: Diagnostics
 
+func pos*(node: Node): Position =
+   for key, value in fieldPairs(node[]):
+      when key == "kind": discard
+      elif value is seq: return value[0].pos
+      else: return value.pos
+   return Position()
 
 func `$`*(node: Node): string =
    if node.isNil: return ""

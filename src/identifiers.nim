@@ -20,6 +20,7 @@ type
    Parameter* = object
       name*: string
       dtype*: Dtype
+      pos*: Position
 
    IdentifierKind* = enum
       dtypeIdentifier,
@@ -29,7 +30,7 @@ type
    Identifier* = ref object
       name*: string
       dtype*: Dtype
-      declarationPos*: Position
+      pos*: Position
       case kind*: IdentifierKind
       of functionIdentifier:
          retDtype*: Dtype
@@ -63,12 +64,12 @@ func `$`*(identifier: Identifier): string =
    of dtypeIdentifier: discard
 
 func newDtypeIdentifier*(name: string, pos: Position): Identifier =
-   return Identifier(kind: dtypeIdentifier, declarationPos: pos)
+   return Identifier(kind: dtypeIdentifier, pos: pos)
 
 func newVariableIdentifier*(name: string, dtype: Dtype, pos: Position): Identifier =
-   return Identifier(kind: variableIdentifier, name: name, dtype: dtype, declarationPos: pos)
+   return Identifier(kind: variableIdentifier, name: name, dtype: dtype, pos: pos)
 
 func newFunctionIdentifier*(name: string, retDtype: Dtype, parameters: seq[Parameter],
       pos: Position): Identifier =
    return Identifier(kind: functionIdentifier, name: name, dtype: tvoid, retDtype: retDtype,
-         parameters: parameters, declarationPos: pos)
+         parameters: parameters, pos: pos)

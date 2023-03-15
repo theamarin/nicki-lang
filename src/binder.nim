@@ -37,6 +37,7 @@ type
          errorToken*: Token
       of boundLiteralExpression:
          value*: Value
+         valueNode*: Node
       of boundIdentifierExpression:
          identifier*: Identifier
       of boundUnaryExpression:
@@ -74,6 +75,14 @@ type
       scope*: BoundScope
 
 
+func pos*(node: Bound): Position =
+   for key, value in fieldPairs(node[]):
+      when key == "kind": discard
+      elif value is seq: return value[0].pos
+      elif value is Token or value is Node or value is Bound: return value.pos
+      else: discard
+   raise (ref ValueError)(msg: "No position for bound " & escape($node.kind))
+
 func `$`*(bound: Bound): string =
    if bound.isNil: return ""
    let intro = $bound.kind & ": "
@@ -97,19 +106,18 @@ func bindErrorExpression(binder: Binder, node: Node): Bound =
 
 func bindLiteralExpression(binder: Binder, node: Node): Bound =
    assert node.kind == literalExpression
+   result = Bound(kind: boundLiteralExpression)
    case node.literal.kind
    of tokenNumber:
-      let value = node.literal.value
-      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
+      result.value = node.literal.value
    of tokenTrue, tokenFalse:
-      let value = Value(dtype: tbool, valBool: node.literal.kind == tokenTrue)
-      return Bound(kind: boundLiteralExpression, value: value,
-            dtype: value.dtype)
+      result.value = Value(dtype: tbool, valBool: node.literal.kind == tokenTrue)
    of tokenString:
-      let value = Value(dtype: tstring, valString: node.literal.text)
-      return Bound(kind: boundLiteralExpression, value: value, dtype: value.dtype)
+      result.value = Value(dtype: tstring, valString: node.literal.text)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literal.kind))
+   result.dtype = result.value.dtype
+   result.valueNode = node
 
 func bindIdentifierExpression(binder: Binder, node: Node): Bound =
    assert node.kind == identifierExpression
@@ -158,6 +166,7 @@ func bindParameter(binder: Binder, node: Node): Parameter =
    assert node.kind == parameterExpression
    result.name = node.parameterName.text
    result.dtype = node.parameterDtype.text.toDtype
+   result.pos = node.parameterName.pos
    if result.dtype == terror:
       binder.diagnostics.reportUndefinedIdentifier(node.parameterDtype.pos,
             node.parameterDtype.text)
@@ -202,8 +211,9 @@ func bindCallExpression(binder: Binder, node: Node): Bound =
       for idx, arg in node.callArguments:
          let argExpression = binder.bindExpression(arg.callArgExpression)
          if argExpression.dtype != parameters[idx].dtype:
-            binder.diagnostics.reportCannotCast(node.callIdentifier.pos, $argExpression.dtype,
-                  $parameters[idx].dtype) # TODO: Pos of argument!
+            binder.diagnostics.reportCannotCast(argExpression.pos, $argExpression.dtype,
+                  $parameters[idx].dtype)
+            binder.diagnostics.reportDefinitionHint(parameters[idx].pos, parameters[idx].name)
          result.callArguments.add(argExpression)
 
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
