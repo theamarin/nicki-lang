@@ -46,10 +46,18 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
    of boundDefinitionExpression:
       var value = Value(dtype: node.defDtype)
       if node.defValue != nil:
-         case node.defValue.dtype:
-         of tint, tbool: value = self.evaluate(node.defValue)
-         else: discard
+         value = self.evaluate(node.defValue)
       self.variables[node.defIdentifier.text] = value
+      return Value(dtype: tvoid)
+   of boundCallExpression:
+      case node.callIdentifier.name
+      of "print":
+         let val = self.evaluate(node.callArguments[0])
+         case val.dtype:
+         of tint: debugEcho $val.valInt
+         of tstring: debugEcho val.valString
+         else: debugEcho "Unsupported data type"
+      else: discard
       return Value(dtype: tvoid)
    of boundConditionalExpression:
       if node.condition == nil or self.evaluate(node.condition).valBool:

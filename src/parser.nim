@@ -14,6 +14,8 @@ type
       parameterExpression = "parameter expression"
       definitionExpression = "definition expression"
       assignmentExpression = "assignment expression"
+      callArgumentExpression = "call argument expression"
+      callExpression = "call expression"
       conditionalExpression = "conditional expression"
       whileExpression = "while expression"
       blockExpression = "block expression"
@@ -53,6 +55,16 @@ type
       of assignmentExpression:
          lvalue*, assignment*: Token
          rvalue*: Node
+      of callArgumentExpression:
+         callArgSeparator*: Token
+         callArgIdentifier*: Token
+         callArgEquals*: Token
+         callArgExpression*: Node
+      of callExpression:
+         callIdentifier*: Token
+         callParanthesisOpen*: Token
+         callArguments*: seq[Node]
+         callParenthesisClose*: Token
       of conditionalExpression:
          conditionToken*: Token
          condition*: Node # nil for "else"
@@ -94,27 +106,28 @@ func `$`*(node: Node): string =
          children.add(prettyPrint(key, $value))
    return intro & "\p" & children.join("\p").indent(3)
 
-func peek(parser: Parser, offset: int = 0): Token =
+func peek(parser: Parser, offset: int = 1): Token =
    return parser.lexer.get(parser.pos + offset)
 
-func current(parser: Parser): Token = parser.peek()
+func current(parser: Parser): Token = parser.peek(0)
 
 func nextToken(parser: var Parser): Token =
    result = parser.current
    parser.pos.inc
 
-func matchToken(parser: var Parser, kind: TokenKind): Token {.discardable.} =
+func matchToken(parser: var Parser, kind: TokenKind,
+      expression: NodeKind|string): Token {.discardable.} =
    if parser.current.kind == kind:
       return parser.nextToken
    else:
-      parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind, $kind)
+      parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind, $kind, $expression)
       return Token()
 
-func matchToken(parser: var Parser, kinds: set[TokenKind]): Token =
+func matchToken(parser: var Parser, kinds: set[TokenKind], expression: NodeKind): Token =
    if parser.current.kind in kinds:
       return parser.nextToken
    else:
-      parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind, $kinds)
+      parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind, $kinds, $expression)
       return Token()
 
 
@@ -125,68 +138,57 @@ func parsePrimaryExpression(parser: var Parser): Node
 func parseExpression(parser: var Parser): Node = parser.parseAssignmentExpression
 
 func parseConditionalExpression(parser: var Parser): Node =
-   let conditionToken = parser.matchToken({tokenIf, tokenElif, tokenElse})
-   let condition =
-      if conditionToken.kind in [tokenIf, tokenElif]:
-         parser.parseExpression
-      else: nil
-   let colonToken = parser.matchToken(tokenColon)
-   let conditional = parser.parseExpression
-   let otherwise: Node =
-      if parser.peek.kind in [tokenElif, tokenElse]:
-         parser.parseConditionalExpression
-      else: nil
-
-   return Node(kind: conditionalExpression, conditionToken: conditionToken,
-         condition: condition, colonToken: colonToken, conditional: conditional,
-         otherwise: otherwise)
+   result = Node(kind: conditionalExpression)
+   result.conditionToken = parser.matchToken({tokenIf, tokenElif, tokenElse}, result.kind)
+   if result.conditionToken.kind in [tokenIf, tokenElif]:
+      result.condition = parser.parseExpression()
+   result.colonToken = parser.matchToken(tokenColon, result.kind)
+   result.conditional = parser.parseExpression
+   if parser.current.kind in [tokenElif, tokenElse]:
+      result.otherwise = parser.parseConditionalExpression
 
 func parseWhileExpression(parser: var Parser): Node =
-   let whileToken = parser.matchToken(tokenWhile)
-   let condition = parser.parseExpression()
-   let colonToken = parser.matchToken(tokenColon)
-   let body = parser.parseExpression()
-   return Node(kind: whileExpression, whileToken: whileToken, whileCondition: condition,
-         whileColon: colonToken, whileBody: body)
+   result = Node(kind: whileExpression)
+   result.whileToken = parser.matchToken(tokenWhile, result.kind)
+   result.whileCondition = parser.parseExpression()
+   result.whileColon = parser.matchToken(tokenColon, result.kind)
+   result.whileBody = parser.parseExpression()
 
 func parseBlockExpression(parser: var Parser): Node =
-   let blockStart = parser.matchToken(tokenBraceOpen)
-   var blockExpressions: seq[Node]
+   result = Node(kind: blockExpression)
+   result.blockStart = parser.matchToken(tokenBraceOpen, result.kind)
    while parser.current.kind notin {tokenBraceClose, tokenEof}:
-      blockExpressions.add(parser.parseExpression())
-   let blockEnd = parser.matchToken(tokenBraceClose)
-
-   return Node(kind: blockExpression, blockStart: blockStart,
-         blockExpressions: blockExpressions, blockEnd: blockEnd)
+      result.blockExpressions.add(parser.parseExpression())
+   result.blockEnd = parser.matchToken(tokenBraceClose, result.kind)
 
 func parseParameterExpression(parser: var Parser, isFirst: bool): Node =
    result = Node(kind: parameterExpression)
    if not isFirst:
-      result.parameterSeparator = parser.matchToken(tokenComma)
-   result.parameterName = parser.matchToken(tokenIdentifier)
-   result.parameterColon = parser.matchToken(tokenColon)
-   result.parameterDtype = parser.matchToken(tokenIdentifier)
+      result.parameterSeparator = parser.matchToken(tokenComma, result.kind)
+   result.parameterName = parser.matchToken(tokenIdentifier, result.kind)
+   result.parameterColon = parser.matchToken(tokenColon, result.kind)
+   result.parameterDtype = parser.matchToken(tokenIdentifier, result.kind)
 
 func parseDefinitionExpression(parser: var Parser): Node =
    result = Node(kind: definitionExpression)
-   result.defToken = parser.matchToken(tokenDef)
-   result.defIdentifier = parser.matchToken(tokenIdentifier)
+   result.defToken = parser.matchToken(tokenDef, result.kind)
+   result.defIdentifier = parser.matchToken(tokenIdentifier, result.kind)
    if parser.current.kind == tokenParanthesisOpen:
-      result.defParameterOpen = parser.matchToken(tokenParanthesisOpen)
-      var isFirst = true
-      while parser.current.kind in {tokenIdentifier, tokenComma}:
-         result.defParameters.add(parser.parseParameterExpression(isFirst))
-         isFirst = false
-      result.defParameterClose = parser.matchToken(tokenParanthesisClose)
+      result.defParameterOpen = parser.matchToken(tokenParanthesisOpen, result.kind)
+      if parser.current.kind == tokenIdentifier:
+         result.defParameters.add(parser.parseParameterExpression(isFirst = true))
+         while parser.current.kind == tokenComma:
+            result.defParameters.add(parser.parseParameterExpression(isFirst = false))
+      result.defParameterClose = parser.matchToken(tokenParanthesisClose, result.kind)
       # Function definitions require return type specification
-      result.defColon = parser.matchToken(tokenColon)
-      result.defDtype = parser.matchToken(tokenIdentifier)
+      result.defColon = parser.matchToken(tokenColon, result.kind)
+      result.defDtype = parser.matchToken(tokenIdentifier, result.kind)
    elif parser.current.kind == tokenColon:
       # Variable definitios have optional type specification
-      result.defColon = parser.matchToken(tokenColon)
-      result.defDtype = parser.matchToken(tokenIdentifier)
+      result.defColon = parser.matchToken(tokenColon, result.kind)
+      result.defDtype = parser.matchToken(tokenIdentifier, result.kind)
    if parser.current.kind == tokenEquals:
-      result.defAssignToken = parser.matchToken(tokenEquals)
+      result.defAssignToken = parser.matchToken(tokenEquals, result.kind)
       if result.defParameterClose != nil:
          result.defAssignExpression = parser.parseBlockExpression()
       else:
@@ -194,9 +196,8 @@ func parseDefinitionExpression(parser: var Parser): Node =
    if result.defColon == nil and result.defAssignToken == nil:
       parser.diagnostics.reportIncompleteDefinition(result.defToken.pos, result.defIdentifier.text)
 
-
 func parseAssignmentExpression(parser: var Parser): Node =
-   if parser.current.kind == tokenIdentifier and parser.peek(1).kind == tokenEquals:
+   if parser.current.kind == tokenIdentifier and parser.peek.kind == tokenEquals:
       let lvalue = parser.nextToken
       let assignment = parser.nextToken()
       let rvalue = parser.parseAssignmentExpression()
@@ -204,19 +205,40 @@ func parseAssignmentExpression(parser: var Parser): Node =
             assignment: assignment, rvalue: rvalue)
    return parser.parseOperatorExpression()
 
+func parseCallArgumentExpression(parser: var Parser, isFirst: bool): Node =
+   result = Node(kind: callArgumentExpression)
+   if not isFirst:
+      result.callArgSeparator = parser.matchToken(tokenComma, result.kind)
+   # result.callArgIdentifier = parser.matchToken(tokenIdentifier)
+   # result.callArgEquals = parser.matchToken(tokenEquals)
+   result.callArgExpression = parser.parseExpression()
+
+func parseCallExpression(parser: var Parser): Node =
+   result = Node(kind: callExpression)
+   result.callIdentifier = parser.matchToken(tokenIdentifier, result.kind)
+   result.callParanthesisOpen = parser.matchToken(tokenParanthesisOpen, result.kind)
+   if parser.current.kind notin {tokenParanthesisClose, tokenEof}:
+      result.callArguments.add(parser.parseCallArgumentExpression(isFirst = true))
+      while parser.current.kind == tokenComma:
+         result.callArguments.add(parser.parseCallArgumentExpression(isFirst = false))
+   result.callParenthesisClose = parser.matchToken(tokenParanthesisClose, result.kind)
+
 func parsePrimaryExpression(parser: var Parser): Node =
    if parser.current.kind == tokenParanthesisOpen:
       let open = parser.nextToken()
-      let expression = parser.parseOperatorExpression
-      let close = parser.matchToken(tokenParanthesisClose)
+      let expression = parser.parseOperatorExpression()
+      let close = parser.matchToken(tokenParanthesisClose, result.kind)
       return Node(kind: paranthesisExpression, open: open,
             expression: expression, close: close)
    elif parser.current.kind in literalTokens:
       let token = parser.nextToken()
       return Node(kind: literalExpression, literal: token)
    elif parser.current.kind == tokenIdentifier:
-      let token = parser.nextToken()
-      return Node(kind: identifierExpression, identifier: token)
+      if parser.peek.kind == tokenParanthesisOpen:
+         return parser.parseCallExpression()
+      else:
+         let token = parser.nextToken()
+         return Node(kind: identifierExpression, identifier: token)
    elif parser.current.kind == tokenDef:
       return parser.parseDefinitionExpression()
    elif parser.current.kind == tokenIf:
@@ -229,7 +251,7 @@ func parsePrimaryExpression(parser: var Parser): Node =
       let expectedKinds = {tokenParanthesisOpen, tokenTrue, tokenFalse, tokenNumber,
             tokenIdentifier, tokenIf, tokenWhile, tokenBraceOpen}
       parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind,
-            $expectedKinds)
+            $expectedKinds, "primary expression")
       return Node()
 
 func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
@@ -240,7 +262,7 @@ func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
       result = Node(kind: unaryExpression, unaryOperator: operatorToken,
             unaryOperand: operand)
    else:
-      result = parser.parsePrimaryExpression
+      result = parser.parsePrimaryExpression()
 
    while true:
       var precedence = getBinaryOperatorPrecedence(parser.current.kind)
@@ -259,6 +281,6 @@ func parse*(text: string): Parser =
       result.diagnostics.add(r)
 
    let left = result.parseExpression
-   result.matchToken(tokenEof)
+   result.matchToken(tokenEof, "parser")
 
    result.root = left

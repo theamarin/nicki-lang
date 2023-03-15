@@ -25,6 +25,7 @@ type
       boundBinaryExpression = "binary expression"
       boundAssignmentExpression = "assignment expression"
       boundDefinitionExpression = "definition expression"
+      boundCallExpression = "call expression"
       boundConditionalExpression = "conditional expression"
       boundWhileExpression = "while expression"
       boundBlockExpression = "block expression"
@@ -53,6 +54,9 @@ type
          defParameters*: seq[Parameter]
          defDtype*: Dtype
          defValue*: Bound
+      of boundCallExpression:
+         callIdentifier*: Identifier
+         callArguments*: seq[Bound]
       of boundConditionalExpression:
          conditionToken*: Token
          condition*: Bound # nil for "else"
@@ -184,6 +188,24 @@ func bindDefinitionExpression(binder: Binder, node: Node): Bound =
    if not binder.scope.tryDeclare(identifier):
       binder.diagnostics.reportAlreadyDefinedIdentifier(node.defToken.pos, node.defToken.text)
 
+func bindCallExpression(binder: Binder, node: Node): Bound =
+   assert node.kind == callExpression
+   result = Bound(kind: boundCallExpression)
+   result.callIdentifier = binder.scope.tryLookup(node.callIdentifier.text)
+   if result.callIdentifier == nil:
+      binder.diagnostics.reportUndefinedIdentifier(node.callIdentifier.pos,
+            node.callIdentifier.text)
+      result.dtype = terror
+   else:
+      result.dtype = result.callIdentifier.retDtype
+      let parameters = result.callIdentifier.parameters
+      for idx, arg in node.callArguments:
+         let argExpression = binder.bindExpression(arg.callArgExpression)
+         if argExpression.dtype != parameters[idx].dtype:
+            binder.diagnostics.reportCannotCast(node.callIdentifier.pos, $argExpression.dtype,
+                  $parameters[idx].dtype) # TODO: Pos of argument!
+         result.callArguments.add(argExpression)
+
 func bindConditionalExpression(binder: Binder, node: Node): Bound =
    assert node.kind == conditionalExpression
    let condition =
@@ -243,6 +265,10 @@ func bindExpression*(binder: Binder, node: Node): Bound =
       raise (ref Exception)(msg: "Unexpected parameter expression")
    of definitionExpression:
       return binder.bindDefinitionExpression(node)
+   of callArgumentExpression:
+      raise (ref Exception)(msg: "Unexpected call argument expression")
+   of callExpression:
+      return binder.bindCallExpression(node)
    of conditionalExpression:
       return binder.bindConditionalExpression(node)
    of whileExpression:

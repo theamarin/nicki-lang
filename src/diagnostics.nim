@@ -40,8 +40,9 @@ func reportUnterminatedString*(self: var Diagnostics, pos: Position) =
 
 # Parser
 func reportUnexpectedToken*(self: var Diagnostics, pos: Position, actual: string,
-      expected: string) =
-   self.report("Unexpected token " & escape(actual) & ", expected " & escape(expected), pos)
+      expected: string, expressionKind: string) =
+   self.report("Unexpected token " & escape(actual) & ", expected " & escape(expected) & " in " &
+         escape(expressionKind), pos)
 
 func reportIncompleteDefinition*(self: var Diagnostics, pos: Position, name: string) =
    self.report("Incomplete definition of " & escape(name) &
