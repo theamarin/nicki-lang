@@ -123,13 +123,14 @@ func toDtype*(bound: Bound, dtypeToken: Token): Dtype =
 
 func bindExpression*(bound: Bound, node: Node): Bound
 
-func bindErrorExpression(bound: Bound, node: Node): Bound =
+func bindErrorExpression(parent: Bound, node: Node): Bound =
    assert node.kind == errorExpression
-   return Bound(kind: boundError, parent: bound, errorToken: node.errorToken)
+   return Bound(kind: boundError, parent: parent, binder: parent.binder,
+         errorToken: node.errorToken)
 
-func bindLiteralExpression(bound: Bound, node: Node): Bound =
+func bindLiteralExpression(parent: Bound, node: Node): Bound =
    assert node.kind == literalExpression
-   result = Bound(kind: boundLiteralExpression, parent: bound)
+   result = Bound(kind: boundLiteralExpression, parent: parent, binder: parent.binder)
    case node.literal.kind
    of tokenNumber:
       result.value = node.literal.value
@@ -142,48 +143,50 @@ func bindLiteralExpression(bound: Bound, node: Node): Bound =
    result.dtype = result.value.dtype
    result.valueNode = node
 
-func bindIdentifierExpression(bound: Bound, node: Node): Bound =
+func bindIdentifierExpression(parent: Bound, node: Node): Bound =
    assert node.kind == identifierExpression
    assert node.identifier.kind == tokenIdentifier
-   result = Bound(kind: boundIdentifierExpression, parent: bound)
+   result = Bound(kind: boundIdentifierExpression, parent: parent, binder: parent.binder)
    let name = node.identifier.text
-   result.identifier = bound.tryLookup(name)
+   result.identifier = result.tryLookup(name)
    if result.identifier != nil:
       result.dtype = result.identifier.dtype
    else:
-      bound.binder.diagnostics.reportUndefinedIdentifier(node.identifier.pos, name)
+      result.binder.diagnostics.reportUndefinedIdentifier(node.identifier.pos, name)
       result.dtype = Dtype(base: terror)
 
-func bindUnaryExpression(bound: Bound, node: Node): Bound =
+func bindUnaryExpression(parent: Bound, node: Node): Bound =
    assert node.kind == unaryExpression
-   let operand = bound.bindExpression(node.unaryOperand)
-   let (operatorKind, resultDtype) = getUnaryOperator(bound.binder.diagnostics,
-         node.unaryOperator, operand.dtype)
-   return Bound(kind: boundUnaryExpression, parent: bound, unaryOperator: operatorKind,
-         unaryOperand: operand, dtype: Dtype(base: resultDtype))
+   result = Bound(kind: boundUnaryExpression, parent: parent, binder: parent.binder)
+   result.unaryOperand = result.bindExpression(node.unaryOperand)
+   let (operatorKind, resultDtype) = getUnaryOperator(result.binder.diagnostics,
+         node.unaryOperator, result.unaryOperand.dtype)
+   result.unaryOperator = operatorKind
+   result.dtype = Dtype(base: resultDtype)
 
-func bindBinaryExpression(bound: Bound, node: Node): Bound =
+func bindBinaryExpression(parent: Bound, node: Node): Bound =
    assert node.kind == binaryExpression
-   let boundLeft = bound.bindExpression(node.left)
-   let boundRight = bound.bindExpression(node.right)
-   let (operatorKind, resultDtype) = getBinaryOperator(bound.binder.diagnostics,
-         boundLeft.dtype, node.binaryOperator, boundRight.dtype)
-   return Bound(kind: boundBinaryExpression, parent: bound, binaryLeft: boundLeft,
-         binaryRight: boundRight, binaryOperator: operatorKind,
-         dtype: Dtype(base: resultDtype))
+   result = Bound(kind: boundBinaryExpression, parent: parent, binder: parent.binder)
+   result.binaryLeft = result.bindExpression(node.left)
+   result.binaryRight = result.bindExpression(node.right)
+   let (operatorKind, resultDtype) = getBinaryOperator(result.binder.diagnostics,
+         result.binaryLeft.dtype, node.binaryOperator, result.binaryRight.dtype)
+   result.binaryOperator = operatorKind
+   result.dtype = Dtype(base: resultDtype)
 
-func bindAssignmentExpression(bound: Bound, node: Node): Bound =
+func bindAssignmentExpression(parent: Bound, node: Node): Bound =
    assert node.kind == assignmentExpression
    assert node.lvalue.kind == tokenIdentifier
-   let rvalue = bound.bindExpression(node.rvalue)
-   let identifier = bound.tryLookup(node.lvalue.text)
+   result = Bound(kind: boundAssignmentExpression, parent: parent, binder: parent.binder)
+   result.lvalue = node.lvalue
+   result.rvalue = result.bindExpression(node.rvalue)
+   let identifier = result.tryLookup(node.lvalue.text)
    if identifier == nil:
-      bound.binder.diagnostics.reportUndefinedIdentifier(node.lvalue.pos, node.lvalue.text)
-   elif identifier.dtype != rvalue.dtype:
-      bound.binder.diagnostics.reportCannotCast(node.assignment.pos, $rvalue.dtype,
+      result.binder.diagnostics.reportUndefinedIdentifier(node.lvalue.pos, node.lvalue.text)
+   elif identifier.dtype != result.rvalue.dtype:
+      result.binder.diagnostics.reportCannotCast(node.assignment.pos, $result.rvalue.dtype,
             $identifier.dtype)
-   return Bound(kind: boundAssignmentExpression, parent: bound, dtype: rvalue.dtype,
-         lvalue: node.lvalue, rvalue: rvalue)
+   result.dtype = result.rvalue.dtype
 
 func bindParameter(bound: Bound, node: Node): Parameter =
    assert node.kind == parameterExpression
@@ -195,108 +198,110 @@ func bindParameter(bound: Bound, node: Node): Parameter =
       bound.binder.diagnostics.reportUndefinedIdentifier(node.parameterDtype.pos,
             node.parameterDtype.text)
 
-func bindDefinitionExpression(bound: Bound, node: Node): Bound =
+func bindDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
-   result = Bound(kind: boundDefinitionExpression, parent: bound)
+   result = Bound(kind: boundDefinitionExpression, parent: parent, binder: parent.binder)
    result.defIdentifier = node.defIdentifier
    result.dtype = Dtype(base: tvoid)
    let isFunc = node.defParameterOpen != nil
    if isFunc:
       result.defDtype = Dtype(base: tfunc)
       for parameter in node.defParameters:
-         let p = bound.bindParameter(parameter)
+         let p = result.bindParameter(parameter)
          result.defDtype.parameters.add(p)
       if node.defDtype != nil:
-         result.defDtype.retDtype = bound.toDtype(node.defDtype)
+         result.defDtype.retDtype = result.toDtype(node.defDtype)
          if result.defDtype.retDtype.base == terror:
-            bound.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
+            result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
                   node.defDtype.text)
       else: result.defDtype.retDtype = Dtype(base: tvoid)
       if node.defAssignExpression != nil:
-         result.defBound = bound.bindExpression(node.defAssignExpression)
-         if result.defDtype != result.defBound.dtype:
-            bound.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
+         result.defBound = result.bindExpression(node.defAssignExpression)
+         if result.defDtype.retDtype != result.defBound.dtype:
+            result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
                   $result.defBound.dtype, $result.defDtype)
    else:
       if node.defDtype != nil:
-         result.defDtype = bound.toDtype(node.defDtype)
+         result.defDtype = result.toDtype(node.defDtype)
          if result.defDtype.base == terror:
-            bound.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
+            result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
                   node.defDtype.text)
       if node.defAssignExpression != nil:
-         result.defBound = bound.bindExpression(node.defAssignExpression)
+         result.defBound = result.bindExpression(node.defAssignExpression)
          if result.defDtype.isNil:
             result.defDtype = result.defBound.dtype
          elif result.defDtype != result.defBound.dtype:
-            bound.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
+            result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
                   $result.defBound.dtype, $result.defDtype)
    let identifier = newVariableIdentifier(node.defIdentifier.text, result.defDtype,
          node.defToken.pos)
-   if not bound.tryDeclare(identifier):
-      bound.binder.diagnostics.reportAlreadyDefinedIdentifier(node.defToken.pos, node.defToken.text)
+   if not result.tryDeclare(identifier):
+      result.binder.diagnostics.reportAlreadyDefinedIdentifier(node.defToken.pos,
+            node.defToken.text)
 
-func bindCallExpression(bound: Bound, node: Node): Bound =
+func bindCallExpression(parent: Bound, node: Node): Bound =
    assert node.kind == callExpression
-   result = Bound(kind: boundCallExpression, parent: bound)
-   result.callIdentifier = bound.tryLookup(node.callIdentifier.text)
+   result = Bound(kind: boundCallExpression, parent: parent, binder: parent.binder)
+   result.callIdentifier = result.tryLookup(node.callIdentifier.text)
    if result.callIdentifier == nil:
-      bound.binder.diagnostics.reportUndefinedIdentifier(node.callIdentifier.pos,
+      result.binder.diagnostics.reportUndefinedIdentifier(node.callIdentifier.pos,
             node.callIdentifier.text)
       result.dtype = Dtype(base: terror)
    elif result.callIdentifier.dtype.base != tfunc:
-      bound.binder.diagnostics.reportCannotCast(result.callIdentifier.pos,
+      result.binder.diagnostics.reportCannotCast(result.callIdentifier.pos,
             $result.callIdentifier.dtype, "func")
    else:
       result.dtype = result.callIdentifier.dtype.retDtype
       let parameters = result.callIdentifier.dtype.parameters
       if node.callArguments.len != parameters.len:
-         bound.binder.diagnostics.reportWrongNumberOfArguments(result.callIdentifier.pos,
+         result.binder.diagnostics.reportWrongNumberOfArguments(result.callIdentifier.pos,
                node.callArguments.len, parameters.len)
       else:
          for idx, arg in node.callArguments:
-            let argExpression = bound.bindExpression(arg.callArgExpression)
+            let argExpression = result.bindExpression(arg.callArgExpression)
             if argExpression.dtype != parameters[idx].dtype:
-               bound.binder.diagnostics.reportCannotCast(argExpression.pos, $argExpression.dtype,
+               result.binder.diagnostics.reportCannotCast(argExpression.pos, $argExpression.dtype,
                      $parameters[idx].dtype)
-               bound.binder.diagnostics.reportDefinitionHint(parameters[idx].pos, parameters[idx].name)
+               result.binder.diagnostics.reportDefinitionHint(parameters[idx].pos, parameters[idx].name)
             result.callArguments.add(argExpression)
 
-func bindConditionalExpression(bound: Bound, node: Node): Bound =
+func bindConditionalExpression(parent: Bound, node: Node): Bound =
    assert node.kind == conditionalExpression
    let condition =
       if node.condition != nil:
-         bound.bindExpression(node.condition)
+         result.bindExpression(node.condition)
       else: nil
    if condition != nil and condition.dtype.base != tbool:
-      bound.binder.diagnostics.reportConditionNotBoolean(node.conditionToken.pos)
-   let conditional = bound.bindExpression(node.conditional)
+      result.binder.diagnostics.reportConditionNotBoolean(node.conditionToken.pos)
+   let conditional = result.bindExpression(node.conditional)
    let otherwise =
-      if node.otherwise != nil: bound.bindConditionalExpression(node.otherwise)
+      if node.otherwise != nil: result.bindConditionalExpression(node.otherwise)
       else: nil
    if conditional.dtype.base != tvoid and node.conditionToken.kind != tokenElse:
       if otherwise == nil:
-         bound.binder.diagnostics.reportMissingElse(node.conditionToken.pos,
+         result.binder.diagnostics.reportMissingElse(node.conditionToken.pos,
                $conditional.dtype)
       elif otherwise.dtype != conditional.dtype:
-         bound.binder.diagnostics.reportInconsistentConditionals(node.conditionToken.pos,
+         result.binder.diagnostics.reportInconsistentConditionals(node.conditionToken.pos,
                $node.conditionToken.text, $conditional.dtype,
                $otherwise.conditionToken.text, $otherwise.dtype)
-   return Bound(kind: boundConditionalExpression, parent: bound, dtype: conditional.dtype,
-         conditionToken: node.conditionToken, condition: condition,
+   return Bound(kind: boundConditionalExpression, parent: parent, binder: parent.binder,
+         dtype: conditional.dtype, conditionToken: node.conditionToken, condition: condition,
          conditional: conditional, otherwise: otherwise)
 
-func bindWhileExpression(bound: Bound, node: Node): Bound =
+func bindWhileExpression(parent: Bound, node: Node): Bound =
    assert node.kind == whileExpression
-   result = Bound(kind: boundWhileExpression, parent: bound)
-   result.whileCondition = bound.bindExpression(node.whileCondition)
-   result.whileBody = bound.bindExpression(node.whileBody)
+   result = Bound(kind: boundWhileExpression, parent: parent, binder: parent.binder)
+   result.whileCondition = result.bindExpression(node.whileCondition)
+   result.whileBody = result.bindExpression(node.whileBody)
    result.dtype = Dtype(base: tvoid)
 
-func bindBlockExpression(bound: Bound, node: Node): Bound =
+func bindBlockExpression(parent: Bound, node: Node): Bound =
    assert node.kind == blockExpression
-   result = Bound(kind: boundBlockExpression, parent: bound)
+   result = Bound(kind: boundBlockExpression, parent: parent, binder: parent.binder)
+   result.scope = BoundScope()
    for expression in node.blockExpressions:
-      result.blockExpressions.add(bound.bindExpression(expression))
+      result.blockExpressions.add(result.bindExpression(expression))
    result.dtype = Dtype(base: tvoid)
    if result.blockExpressions.len > 0:
       result.dtype = result.blockExpressions[^1].dtype

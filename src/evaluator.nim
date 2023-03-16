@@ -11,6 +11,7 @@ type
 
    Evaluator* = ref object
       variables*: Table[string, Variable]
+      parent*: Evaluator
 
 func `$`*(self: Variable): string =
    case self.kind
@@ -19,12 +20,17 @@ func `$`*(self: Variable): string =
       if self.implementation.isNil: return "[func decl]"
       else: return "[func impl]"
 
+func tryLookup*(self: Evaluator, name: string): Variable =
+   if name in self.variables: return self.variables[name]
+   elif not self.parent.isNil: return self.parent.tryLookup(name)
+   else: return nil
+
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
    of boundError: return Value(dtype: Dtype(base: terror))
    of boundRoot: return Value(dtype: Dtype(base: terror))
    of boundLiteralExpression: return node.value
-   of boundIdentifierExpression: return self.variables[node.identifier.name].value
+   of boundIdentifierExpression: return self.tryLookup(node.identifier.name).value
    of boundUnaryExpression:
       case node.unaryOperator
       of boundUnaryPlus: return self.evaluate(node.unaryOperand)
@@ -75,7 +81,7 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
          debugEcho $val
          return Value(dtype: Dtype(base: tvoid))
       else:
-         let impl = self.variables[node.callIdentifier.name].implementation
+         let impl = self.tryLookup(node.callIdentifier.name).implementation
          return self.evaluate(impl)
    of boundConditionalExpression:
       if node.condition == nil or self.evaluate(node.condition).valBool:
@@ -88,6 +94,8 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
          discard self.evaluate(node.whileBody)
       return Value(dtype: Dtype(base: tvoid))
    of boundBlockExpression:
+      var scope = Evaluator(parent: self)
+      var lastValue = Value(dtype: Dtype(base: tvoid))
       for expression in node.blockExpressions:
-         discard self.evaluate(expression)
-      return Value(dtype: Dtype(base: tvoid))
+         lastValue = scope.evaluate(expression)
+      return lastValue

@@ -1,0 +1,5 @@
+{
+   def sum(a: int, b: int): int = { 4 }
+
+   sum(4, 4)
+}
