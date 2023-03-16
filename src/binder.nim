@@ -17,7 +17,7 @@ type
       boundWhileLoop = "while bound"
       boundBlock = "block bound"
 
-   BoundScope* = ref Table[string, Identifier]
+   BoundScope* = ref OrderedTable[string, Identifier]
 
    Bound* = ref object
       scope*: BoundScope
@@ -65,6 +65,7 @@ type
       root*: Bound
       diagnostics*: Diagnostics
       scope*: BoundScope
+      baseTypes: Table[DtypeBase, Dtype]
 
 func getScope*(self: Bound): Bound =
    if self == nil: raise (ref Exception)(msg: "bound is nil!")
@@ -88,12 +89,14 @@ func tryLookup*(self: Bound, name: string): Identifier =
    elif bound.parent != nil: return bound.parent.tryLookup(name)
    else: return nil
 
+func toIdentifier(dtype: Dtype): Identifier =
+   return Identifier(name: $dtype.base, dtype: Dtype(base: ttype, dtype: dtype))
+
 func addBaseDtypes*(self: Bound) =
-   discard self.tryDeclare(Identifier(kind: dtypeIdentifier, name: $terror, dtype: Dtype(base: terror)))
-   discard self.tryDeclare(Identifier(kind: dtypeIdentifier, name: $tvoid, dtype: Dtype(base: tvoid)))
-   discard self.tryDeclare(Identifier(kind: dtypeIdentifier, name: $tbool, dtype: Dtype(base: tbool)))
-   discard self.tryDeclare(Identifier(kind: dtypeIdentifier, name: $tint, dtype: Dtype(base: tint)))
-   discard self.tryDeclare(Identifier(kind: dtypeIdentifier, name: $tstr, dtype: Dtype(base: tstr)))
+   for dtypeBase in DtypeBase:
+      let dtype = Dtype(base: dtypeBase)
+      self.binder.baseTypes[dtypeBase] = dtype
+      discard self.tryDeclare(toIdentifier(dtype))
 
 func pos*(node: Bound): Position =
    for key, value in fieldPairs(node[]):
@@ -118,12 +121,11 @@ func `$`*(bound: Bound): string =
    return intro & "\p" & children.join("\p").indent(3)
 
 func toDtype*(bound: Bound, dtypeToken: Token): Dtype =
-   if dtypeToken.text in basicDtypeStrings:
-      return Dtype(base: basicDtypeStrings[dtypeToken.text])
    let id = bound.tryLookup(dtypeToken.text)
-   if id == nil: return Dtype(base: terror)
-   elif id.kind != dtypeIdentifier:
-      bound.binder.diagnostics.reportWrongIdentifier(dtypeToken.pos, $id.kind, $dtypeIdentifier)
+   if id == nil: return bound.binder.baseTypes[terror]
+   elif id.dtype.base != ttype:
+      bound.binder.diagnostics.reportWrongIdentifier(dtypeToken.pos, $id.dtype.base, $ttype)
+   else: return id.dtype.dtype
 
 func bindExpression*(bound: Bound, node: Node): Bound
 
@@ -139,7 +141,7 @@ func bindLiteralExpression(parent: Bound, node: Node): Bound =
    of tokenNumber:
       result.value = node.literal.value
    of tokenTrue, tokenFalse:
-      result.value = Value(dtype: Dtype(base: tbool), valBool: node.literal.kind == tokenTrue)
+      result.value = Value(dtype: result.binder.baseTypes[tbool], valBool: node.literal.kind == tokenTrue)
    of tokenString:
       result.value = node.literal.value
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
@@ -157,7 +159,7 @@ func bindIdentifierExpression(parent: Bound, node: Node): Bound =
       result.dtype = result.identifier.dtype
    else:
       result.binder.diagnostics.reportUndefinedIdentifier(node.identifier.pos, name)
-      result.dtype = Dtype(base: terror)
+      result.dtype = result.binder.baseTypes[terror]
 
 func bindUnaryExpression(parent: Bound, node: Node): Bound =
    assert node.kind == unaryExpression
@@ -166,7 +168,7 @@ func bindUnaryExpression(parent: Bound, node: Node): Bound =
    let (operatorKind, resultDtype) = getUnaryOperator(result.binder.diagnostics,
          node.unaryOperator, result.unaryOperand.dtype)
    result.unaryOperator = operatorKind
-   result.dtype = Dtype(base: resultDtype)
+   result.dtype = result.binder.baseTypes[resultDtype]
 
 func bindBinaryExpression(parent: Bound, node: Node): Bound =
    assert node.kind == binaryExpression
@@ -176,7 +178,7 @@ func bindBinaryExpression(parent: Bound, node: Node): Bound =
    let (operatorKind, resultDtype) = getBinaryOperator(result.binder.diagnostics,
          result.binaryLeft.dtype, node.binaryOperator, result.binaryRight.dtype)
    result.binaryOperator = operatorKind
-   result.dtype = Dtype(base: resultDtype)
+   result.dtype = result.binder.baseTypes[resultDtype]
 
 func bindAssignmentExpression(parent: Bound, node: Node): Bound =
    assert node.kind == assignmentExpression
@@ -194,7 +196,7 @@ func bindAssignmentExpression(parent: Bound, node: Node): Bound =
 
 func bindParameter(bound: Bound, node: Node): Identifier =
    assert node.kind == parameterExpression
-   result = Identifier(kind: variableIdentifier)
+   result = Identifier()
    result.name = node.parameterName.text
    result.dtype = bound.toDtype(node.parameterDtype)
    result.pos = node.parameterName.pos
@@ -206,10 +208,10 @@ func bindDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
    result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
    result.defIdentifier = node.defIdentifier
-   result.dtype = Dtype(base: tvoid)
+   result.dtype = result.binder.baseTypes[tvoid]
    let isFunc = node.defParameterOpen != nil
    if isFunc:
-      result.defDtype = Dtype(base: tfunc)
+      result.defDtype = result.binder.baseTypes[tfunc]
       result.scope = BoundScope()
       for parameter in node.defParameters:
          let p = result.bindParameter(parameter)
@@ -220,7 +222,7 @@ func bindDefinitionExpression(parent: Bound, node: Node): Bound =
          if result.defDtype.retDtype.base == terror:
             result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
                   node.defDtype.text)
-      else: result.defDtype.retDtype = Dtype(base: tvoid)
+      else: result.defDtype.retDtype = result.binder.baseTypes[tvoid]
       if node.defAssignExpression != nil:
          result.defBound = result.bindExpression(node.defAssignExpression)
          if result.defBound.dtype != result.defDtype.retDtype and
@@ -240,8 +242,8 @@ func bindDefinitionExpression(parent: Bound, node: Node): Bound =
          elif result.defDtype != result.defBound.dtype:
             result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
                   $result.defBound.dtype, $result.defDtype)
-   let identifier = newVariableIdentifier(node.defIdentifier.text, result.defDtype,
-         node.defToken.pos)
+   let identifier = Identifier(name: node.defIdentifier.text, dtype: result.defDtype,
+         pos: node.defToken.pos)
    parent.tryDeclare(identifier)
 
 func bindCallExpression(parent: Bound, node: Node): Bound =
@@ -251,7 +253,7 @@ func bindCallExpression(parent: Bound, node: Node): Bound =
    if result.callIdentifier == nil:
       result.binder.diagnostics.reportUndefinedIdentifier(node.callIdentifier.pos,
             node.callIdentifier.text)
-      result.dtype = Dtype(base: terror)
+      result.dtype = result.binder.baseTypes[terror]
    elif result.callIdentifier.dtype.base != tfunc:
       result.binder.diagnostics.reportCannotCast(result.callIdentifier.pos,
             $result.callIdentifier.dtype, "func")
@@ -299,7 +301,7 @@ func bindWhileExpression(parent: Bound, node: Node): Bound =
    result = Bound(kind: boundWhileLoop, parent: parent, binder: parent.binder)
    result.whileCondition = result.bindExpression(node.whileCondition)
    result.whileBody = result.bindExpression(node.whileBody)
-   result.dtype = Dtype(base: tvoid)
+   result.dtype = result.binder.baseTypes[tvoid]
 
 func bindBlockExpression(parent: Bound, node: Node): Bound =
    assert node.kind == blockExpression
@@ -307,7 +309,7 @@ func bindBlockExpression(parent: Bound, node: Node): Bound =
    result.scope = BoundScope()
    for expression in node.blockExpressions:
       result.blockExpressions.add(result.bindExpression(expression))
-   result.dtype = Dtype(base: tvoid)
+   result.dtype = result.binder.baseTypes[tvoid]
    if result.blockExpressions.len > 0:
       result.dtype = result.blockExpressions[^1].dtype
 
@@ -351,3 +353,4 @@ func bindExpression*(binder: Binder, node: Node): Bound =
 func newBinder*(parent: BoundScope = nil): Binder =
    result = Binder()
    result.root = Bound(kind: boundRoot, scope: BoundScope(), binder: result)
+   result.root.addBaseDtypes()

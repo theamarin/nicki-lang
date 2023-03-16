@@ -11,19 +11,21 @@ type
       tint = "int"
       tstr = "str"
       # Derived types (need more info)
+      ttype = "type"
       tfunc = "func"
       tstruct = "struct"
       tenum = "enum"
 
 const
-   basicDtypes* = {terror, tvoid, tbool, tint, tstr}
-   basicDtypeStrings* = [("void", tvoid), ("bool", tbool), ("int", tint), ("str", tstr)].toTable
+   basicDtypes* = {tvoid, tbool, tint, tstr}
 
 type
    Dtype* = ref object
       pos*: Position
       case base*: DtypeBase
-      of basicDtypes: discard
+      of terror, basicDtypes: discard
+      of ttype:
+         dtype*: Dtype
       of tfunc:
          retDtype*: Dtype
          parameters*: seq[Identifier]
@@ -32,24 +34,22 @@ type
       of tenum:
          enumerals*: OrderedTable[int, string]
 
+   Identifier* = ref object
+      name*: string
+      pos*: Position
+      dtype*: Dtype
+
    Value* = ref object
       pos*: Position
       dtype*: Dtype
       valBool*: bool
       valInt*: int
       valStr*: string
+      valDtype*: Dtype
       valEnum*: int
       structMembers*: OrderedTable[string, Value]
 
-   IdentifierKind* = enum
-      dtypeIdentifier,
-      variableIdentifier
 
-   Identifier* = ref object
-      name*: string
-      pos*: Position
-      kind*: IdentifierKind
-      dtype*: Dtype
 
 func `==`*(l, r: Dtype): bool =
    if l.base != r.base: return false
@@ -58,11 +58,20 @@ func `==`*(l, r: Dtype): bool =
 
 
 func `$`*(dtype: Dtype): string =
+   result = $dtype.base
    case dtype.base
-   of terror, tvoid, tbool, tint, tstr: return $dtype.base
-   of tfunc: return "[func]"
-   of tstruct: return "[struct]"
-   of tenum: return "[enum]"
+   of terror, tvoid, tbool, tint, tstr: discard
+   of ttype:
+      if not dtype.dtype.isNil: result &= "<" & $dtype.dtype & ">"
+   of tfunc:
+      if not dtype.retDtype.isNil:
+         result &= "("
+         for idx, p in dtype.parameters:
+            if idx > 0: result &= ", "
+            result &= p.name & ": " & $p.dtype
+         result &= "):" & $dtype.retDtype
+   of tstruct: discard
+   of tenum: discard
 
 func `$`*(val: Value): string =
    case val.dtype.base
@@ -71,19 +80,10 @@ func `$`*(val: Value): string =
    of tbool: return $val.valBool
    of tint: return $val.valInt
    of tstr: return $val.valStr
+   of ttype: return $val.valDtype
    of tfunc: return "[func]"
    of tstruct: return "[struct]"
    of tenum: return "[enum]"
 
 func `$`*(id: Identifier): string =
-   case id.kind
-   of variableIdentifier: return id.name & ": " & $id.dtype
-   of dtypeIdentifier:
-      if id.dtype.base in basicDtypes: return $id.dtype.base
-      else: return id.name & ": " & $id.dtype.base
-
-func newDtypeIdentifier*(name: string, pos: Position): Identifier =
-   return Identifier(kind: dtypeIdentifier, pos: pos)
-
-func newVariableIdentifier*(name: string, dtype: Dtype, pos: Position): Identifier =
-   return Identifier(kind: variableIdentifier, name: name, dtype: dtype, pos: pos)
+   return id.name & ": " & $id.dtype

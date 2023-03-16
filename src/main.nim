@@ -5,7 +5,7 @@ var showTree = false
 var showBind = false
 var showVars = false
 
-var myEvaluator = Evaluator()
+var myEvaluator = newEvaluator()
 var myBinder = newBinder()
 
 var filename = ""
@@ -50,8 +50,8 @@ while true:
          echo " " & $identifier
 
       echo "Variables: "
-      for variable, value in myEvaluator.variables:
-         echo " " & $variable & ": " & $value
+      for name, variable in myEvaluator.variables:
+         echo " " & $name & ": " & variable.typeStr & " = " & $variable
 
    write(stdout, prompt)
    var line: string

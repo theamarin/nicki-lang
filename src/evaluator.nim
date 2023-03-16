@@ -1,4 +1,4 @@
-import tables
+import tables, strutils
 import identifiers, evaluator_ops, binder
 
 type
@@ -10,20 +10,32 @@ type
       of vkImplementation: implementation*: Bound
 
    Evaluator* = ref object
-      variables*: Table[string, Variable]
+      variables*: OrderedTable[string, Variable]
       parent*: Evaluator
 
 func `$`*(self: Variable): string =
    case self.kind
    of vkValue: return $self.value
    of vkImplementation:
-      if self.implementation.isNil: return "[func decl]"
-      else: return "[func impl]"
+      if self.implementation.isNil: return "[undefined]"
+      else: return "[implementation]"
+
+func typeStr*(self: Variable): string =
+   case self.kind
+   of vkValue: return $self.value.dtype
+   of vkImplementation: return "[func]"
 
 func tryLookup*(self: Evaluator, name: string): Variable =
    if name in self.variables: return self.variables[name]
    elif not self.parent.isNil: return self.parent.tryLookup(name)
-   else: return nil
+   else: raise (ref KeyError)(msg: "Undefined identifier " & escape(name))
+
+func typeVariable(base: DtypeBase): Variable =
+   Variable(kind: vkValue, value: Value(dtype: Dtype(base: ttype), valDtype: Dtype(base: base)))
+
+func addBaseDtypes*(self: Evaluator) =
+   for dtypeBase in DtypeBase:
+      self.variables[$dtypeBase] = typeVariable(dtypeBase)
 
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
@@ -61,8 +73,8 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       of boundBinaryLogicalXor: return left xor right
    of boundAssignment:
       let rvalue = self.evaluate(node.rvalue)
-      let lvalue = node.lvalue
-      self.variables[lvalue.text] = Variable(kind: vkValue, value: rvalue)
+      let variable = self.tryLookup(node.lvalue.text)
+      variable.value = rvalue
       return rvalue
    of boundDefinition:
       var value = Value(dtype: node.defDtype)
@@ -103,3 +115,7 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       for expression in node.blockExpressions:
          lastValue = scope.evaluate(expression)
       return lastValue
+
+func newEvaluator*(): Evaluator =
+   result = Evaluator()
+   result.addBaseDtypes()
