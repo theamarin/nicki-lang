@@ -29,14 +29,14 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
    of boundError: return Value(dtype: Dtype(base: terror))
    of boundRoot: return Value(dtype: Dtype(base: terror))
-   of boundLiteralExpression: return node.value
-   of boundIdentifierExpression: return self.tryLookup(node.identifier.name).value
-   of boundUnaryExpression:
+   of boundLiteral: return node.value
+   of boundIdentifier: return self.tryLookup(node.identifier.name).value
+   of boundUnaryOperator:
       case node.unaryOperator
       of boundUnaryPlus: return self.evaluate(node.unaryOperand)
       of boundUnaryMinus: return self.evaluate(node.unaryOperand).negative
       of boundUnaryNot: return self.evaluate(node.unaryOperand).logicalNot
-   of boundBinaryExpression:
+   of boundBinaryOperator:
       let left = self.evaluate(node.binaryLeft)
       let right = self.evaluate(node.binaryRight)
       case node.binaryOperator
@@ -59,12 +59,12 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       of boundBinaryLogicalAnd: return left and right
       of boundBinaryLogicalOr: return left or right
       of boundBinaryLogicalXor: return left xor right
-   of boundAssignmentExpression:
+   of boundAssignment:
       let rvalue = self.evaluate(node.rvalue)
       let lvalue = node.lvalue
       self.variables[lvalue.text] = Variable(kind: vkValue, value: rvalue)
       return rvalue
-   of boundDefinitionExpression:
+   of boundDefinition:
       var value = Value(dtype: node.defDtype)
       if node.defDtype.base == tfunc:
          let variable = Variable(kind: vkImplementation, implementation: node.defBound)
@@ -74,7 +74,7 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
             value = self.evaluate(node.defBound)
          self.variables[node.defIdentifier.text] = Variable(kind: vkValue, value: value)
       return Value(dtype: Dtype(base: tvoid))
-   of boundCallExpression:
+   of boundFunctionCall:
       case node.callIdentifier.name
       of "print":
          let val = self.evaluate(node.callArguments[0])
@@ -82,18 +82,22 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
          return Value(dtype: Dtype(base: tvoid))
       else:
          let impl = self.tryLookup(node.callIdentifier.name).implementation
-         return self.evaluate(impl)
-   of boundConditionalExpression:
+         var scope = Evaluator(parent: self)
+         for idx, p in node.callIdentifier.dtype.parameters:
+            let arg = self.evaluate(node.callArguments[idx])
+            scope.variables[p.name] = Variable(kind: vkValue, value: arg)
+         return scope.evaluate(impl)
+   of boundConditional:
       if node.condition == nil or self.evaluate(node.condition).valBool:
          return self.evaluate(node.conditional)
       elif node.otherwise != nil:
          return self.evaluate(node.otherwise)
       else: return Value(dtype: Dtype(base: terror))
-   of boundWhileExpression:
+   of boundWhileLoop:
       while self.evaluate(node.whileCondition).valBool:
          discard self.evaluate(node.whileBody)
       return Value(dtype: Dtype(base: tvoid))
-   of boundBlockExpression:
+   of boundBlock:
       var scope = Evaluator(parent: self)
       var lastValue = Value(dtype: Dtype(base: tvoid))
       for expression in node.blockExpressions:

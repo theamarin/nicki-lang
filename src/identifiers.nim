@@ -26,16 +26,11 @@ type
       of basicDtypes: discard
       of tfunc:
          retDtype*: Dtype
-         parameters*: seq[Parameter]
+         parameters*: seq[Identifier]
       of tstruct:
          members*: OrderedTable[string, Dtype]
       of tenum:
          enumerals*: OrderedTable[int, string]
-
-   Parameter* = ref object
-      pos*: Position
-      name*: string
-      dtype*: Dtype
 
    Value* = ref object
       pos*: Position
@@ -79,11 +74,6 @@ func `$`*(val: Value): string =
    of tfunc: return "[func]"
    of tstruct: return "[struct]"
    of tenum: return "[enum]"
-
-func `$`*(id: Identifier): string
-
-func `$`*(parameter: Parameter): string =
-   return parameter.name & ": " & $parameter.dtype
 
 func `$`*(id: Identifier): string =
    case id.kind
