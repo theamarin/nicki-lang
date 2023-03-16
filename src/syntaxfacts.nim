@@ -11,7 +11,7 @@ func getUnaryOperatorPrecedence*(tokenKind: TokenKind): int =
 
 func getBinaryOperatorPrecedence*(tokenKind: TokenKind): int =
    case tokenKind
-   of tokenComma: return 1
+   # of tokenComma: return 1 # Comma operator currently prevents call expressions from working.
    of tokenEquals: return 2 # Assignments
    # 3: Ternary conditional
    of tokenOr, tokenPipePipe: return 4 # Logical OR

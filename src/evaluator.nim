@@ -2,14 +2,29 @@ import tables
 import identifiers, evaluator_ops, binder
 
 type
+   VariableKind* = enum vkValue, vkImplementation
+
+   Variable* = ref object
+      case kind: VariableKind
+      of vkValue: value*: Value
+      of vkImplementation: implementation*: Bound
+
    Evaluator* = ref object
-      variables*: Table[string, Value]
+      variables*: Table[string, Variable]
+
+func `$`*(self: Variable): string =
+   case self.kind
+   of vkValue: return $self.value
+   of vkImplementation:
+      if self.implementation.isNil: return "[func decl]"
+      else: return "[func impl]"
 
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
-   of boundError: return Value(dtype: terror)
+   of boundError: return Value(dtype: Dtype(base: terror))
+   of boundRoot: return Value(dtype: Dtype(base: terror))
    of boundLiteralExpression: return node.value
-   of boundIdentifierExpression: return self.variables[node.identifier.name]
+   of boundIdentifierExpression: return self.variables[node.identifier.name].value
    of boundUnaryExpression:
       case node.unaryOperator
       of boundUnaryPlus: return self.evaluate(node.unaryOperand)
@@ -29,47 +44,50 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       of boundBinaryGreaterEquals: return left >= right
       of boundBinaryLessThan: return left < right
       of boundBinaryLessEquals: return left <= right
-      of boundBinaryCompinedComparison:
+      of boundBinaryCombinedComparison:
          let res: int =
             if (left > right).valBool: 1
             elif (left < right).valBool: -1
             else: 0
-         return Value(dtype: tint, valInt: res)
+         return Value(dtype: Dtype(base: tint), valInt: res)
       of boundBinaryLogicalAnd: return left and right
       of boundBinaryLogicalOr: return left or right
       of boundBinaryLogicalXor: return left xor right
    of boundAssignmentExpression:
       let rvalue = self.evaluate(node.rvalue)
       let lvalue = node.lvalue
-      self.variables[lvalue.text] = rvalue
+      self.variables[lvalue.text] = Variable(kind: vkValue, value: rvalue)
       return rvalue
    of boundDefinitionExpression:
       var value = Value(dtype: node.defDtype)
-      if node.defValue != nil:
-         value = self.evaluate(node.defValue)
-      self.variables[node.defIdentifier.text] = value
-      return Value(dtype: tvoid)
+      if node.defDtype.base == tfunc:
+         let variable = Variable(kind: vkImplementation, implementation: node.defBound)
+         self.variables[node.defIdentifier.text] = variable
+      else:
+         if node.defBound != nil:
+            value = self.evaluate(node.defBound)
+         self.variables[node.defIdentifier.text] = Variable(kind: vkValue, value: value)
+      return Value(dtype: Dtype(base: tvoid))
    of boundCallExpression:
       case node.callIdentifier.name
       of "print":
          let val = self.evaluate(node.callArguments[0])
-         case val.dtype:
-         of tint: debugEcho $val.valInt
-         of tstring: debugEcho val.valString
-         else: debugEcho "Unsupported data type"
-      else: discard
-      return Value(dtype: tvoid)
+         debugEcho $val
+         return Value(dtype: Dtype(base: tvoid))
+      else:
+         let impl = self.variables[node.callIdentifier.name].implementation
+         return self.evaluate(impl)
    of boundConditionalExpression:
       if node.condition == nil or self.evaluate(node.condition).valBool:
          return self.evaluate(node.conditional)
       elif node.otherwise != nil:
          return self.evaluate(node.otherwise)
-      else: return Value(dtype: terror)
+      else: return Value(dtype: Dtype(base: terror))
    of boundWhileExpression:
       while self.evaluate(node.whileCondition).valBool:
          discard self.evaluate(node.whileBody)
-      return Value(dtype: tvoid)
+      return Value(dtype: Dtype(base: tvoid))
    of boundBlockExpression:
       for expression in node.blockExpressions:
          discard self.evaluate(expression)
-      return Value(dtype: tvoid)
+      return Value(dtype: Dtype(base: tvoid))

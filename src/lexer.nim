@@ -65,7 +65,7 @@ type
 
    Token* = ref object
       case kind*: TokenKind
-      of tokenNumber: value*: Value
+      of tokenNumber, tokenString: value*: Value
       else: discard
       pos*: Position
       text*: string
@@ -154,7 +154,7 @@ func lexNumber(l: Lexer): Token =
       try: parseInt(text)
       except ValueError:
          l.diagnostics.reportCannotParseNumber(start, text); 0
-   let value = Value(dtype: tint, valInt: valInt)
+   let value = Value(dtype: Dtype(base: tint), valInt: valInt)
    return Token(kind: tokenNumber, pos: start, text: text, value: value)
 
 func lexWhitespace(l: Lexer): Token =
@@ -181,8 +181,10 @@ func lexString(l: Lexer): Token =
       l.next
    else:
       l.diagnostics.reportUnterminatedString(start)
-   let text = l.text.substr(start.abs+1, l.pos.abs - 2)
-   return Token(kind: tokenString, pos: start, text: text)
+   let text = l.text.substr(start.abs, l.pos.abs - 1)
+   let valStr = l.text.substr(start.abs+1, l.pos.abs - 2)
+   let value = Value(dtype: Dtype(base: tstr), valStr: valStr)
+   return Token(kind: tokenString, pos: start, text: text, value: value)
 
 func newToken(l: Lexer, kind: TokenKind, text = ""): Token =
    let myText = if text.len > 0: text else: $kind

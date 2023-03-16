@@ -65,6 +65,15 @@ func reportUndefinedIdentifier*(self: var Diagnostics, pos: Position, name: stri
 func reportAlreadyDefinedIdentifier*(self: var Diagnostics, pos: Position, name: string) =
    self.report("Identifier " & escape(name) & " already defined", pos)
 
+func reportWrongIdentifier*(self: var Diagnostics, pos: Position, kindActual: string,
+      kindExpected: string) =
+   self.report("Identifier is " & escape(kindActual) & ", but expected " & escape(kindExpected), pos)
+
+func reportWrongNumberOfArguments*(self: var Diagnostics, pos: Position, argNumActual,
+      argNumExpected: int) =
+   self.report("Wrong number of arguments, got " & escape($argNumActual) & ", but expected " &
+         escape($argNumExpected), pos)
+
 func reportCannotCast*(self: var Diagnostics, pos: Position, dtypeFrom: string, dtypeTo: string) =
    self.report("Cannot cast " & escape(dtypeFrom) & " to data type " & escape(dtypeTo), pos)
 

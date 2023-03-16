@@ -9,10 +9,10 @@ type
 
    BoundUnaryOperatorMatch = tuple
       tokenKind: TokenKind
-      operandDtype: Dtype
+      operandDtype: DtypeBase
    BoundUnaryOperatorResult = tuple
       operatorKind: BoundUnaryOperatorKind
-      resultDtype: Dtype
+      resultDtype: DtypeBase
    BoundUnaryOperator = tuple
       match: BoundUnaryOperatorMatch
       result: BoundUnaryOperatorResult
@@ -29,18 +29,18 @@ type
       boundBinaryGreaterEquals = "greater equals",
       boundBinaryLessThan = "less than",
       boundBinaryLessEquals = "less or equals",
-      boundBinaryCompinedComparison = "combined comparison",
+      boundBinaryCombinedComparison = "combined comparison",
       boundBinaryLogicalAnd = "logical and",
       boundBinaryLogicalOr = "logical or"
       boundBinaryLogicalXor = "logical xor"
 
    BoundBinaryOperatorMatch = tuple
-      leftDtype: Dtype
+      leftDtype: DtypeBase
       tokenKind: TokenKind
-      rightDtype: Dtype
+      rightDtype: DtypeBase
    BoundBinaryOperatorResult = tuple
       operatorKind: BoundBinaryOperatorKind
-      resultDtype: Dtype
+      resultDtype: DtypeBase
    BoundBinaryOperator = tuple
       match: BoundBinaryOperatorMatch
       result: BoundBinaryOperatorResult
@@ -74,7 +74,7 @@ const
       ((tint, tokenGreaterEquals, tint), (boundBinaryGreaterEquals, tbool)),
       ((tint, tokenLess, tint), (boundBinaryLessThan, tbool)),
       ((tint, tokenLessEquals, tint), (boundBinaryLessEquals, tbool)),
-      ((tint, tokenCombinedComparison, tint), (boundBinaryCompinedComparison,
+      ((tint, tokenCombinedComparison, tint), (boundBinaryCombinedComparison,
             tint)),
 
       ((tbool, tokenAmpAmp, tbool), (boundBinaryLogicalAnd, tbool)),
@@ -89,15 +89,15 @@ const
 
 func getUnaryOperator*(diagnostics: var Diagnostics, token: Token,
       dtype: Dtype): BoundUnaryOperatorResult =
-   if (token.kind, dtype) in boundUnaryOperators:
-      return boundUnaryOperators[(token.kind, dtype)]
-   elif dtype == terror: discard
+   if (token.kind, dtype.base) in boundUnaryOperators:
+      return boundUnaryOperators[(token.kind, dtype.base)]
+   elif dtype.base == terror: discard
    else: diagnostics.reportUndefinedUnaryOperator(token.pos, $token.kind, $dtype)
 
 func getBinaryOperator*(diagnostics: var Diagnostics, leftDtype: Dtype, token: Token,
       rightDtype: Dtype): BoundBinaryOperatorResult =
-   if (leftDtype, token.kind, rightDtype) in boundBinaryOperators:
-      return boundBinaryOperators[(leftDtype, token.kind, rightDtype)]
-   elif terror in [leftDtype, rightDtype]: discard
+   if (leftDtype.base, token.kind, rightDtype.base) in boundBinaryOperators:
+      return boundBinaryOperators[(leftDtype.base, token.kind, rightDtype.base)]
+   elif terror in [leftDtype.base, rightDtype.base]: discard
    else:
       diagnostics.reportUndefinedBinaryOperator(token.pos, $token.kind, $leftDtype, $rightDtype)

@@ -1,9 +1,9 @@
 {
-   def x: bool
+   def print(a: int): void
    def y: int
-   while x:
+   while y < 10:
    {
+      print(y)
       y = y + 1
-      if y > 5: x = false else: false
    }
 }
