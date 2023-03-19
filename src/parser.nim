@@ -231,14 +231,13 @@ func parseCallExpression(parser: var Parser): Node =
 
 func parsePrimaryExpression(parser: var Parser): Node =
    if parser.current.kind == tokenParanthesisOpen:
-      let open = parser.nextToken()
-      let expression = parser.parseOperatorExpression()
-      let close = parser.matchToken(tokenParanthesisClose, result.kind)
-      return Node(kind: paranthesisExpression, open: open,
-            expression: expression, close: close)
+      result = Node(kind: paranthesisExpression)
+      result.open = parser.nextToken()
+      result.expression = parser.parseOperatorExpression()
+      result.close = parser.matchToken(tokenParanthesisClose, result.kind)
    elif parser.current.kind in literalTokens:
-      let token = parser.nextToken()
-      return Node(kind: literalExpression, literal: token)
+      result = Node(kind: literalExpression)
+      result.literal = parser.nextToken()
    elif parser.current.kind == tokenIdentifier:
       if parser.peek.kind == tokenParanthesisOpen:
          return parser.parseCallExpression()
@@ -263,10 +262,9 @@ func parsePrimaryExpression(parser: var Parser): Node =
 func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
    let unaryOperatorPrecedence = getUnaryOperatorPrecedence(parser.current.kind)
    if unaryOperatorPrecedence != 0 and unaryOperatorPrecedence >= parentPrecedence:
-      let operatorToken = parser.nextToken
-      let operand = parser.parseOperatorExpression(unaryOperatorPrecedence)
-      result = Node(kind: unaryExpression, unaryOperator: operatorToken,
-            unaryOperand: operand)
+      result = Node(kind: unaryExpression)
+      result.unaryOperator = parser.nextToken
+      result.unaryOperand = parser.parseOperatorExpression(unaryOperatorPrecedence)
    else:
       result = parser.parsePrimaryExpression()
 
@@ -274,10 +272,11 @@ func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
       var precedence = getBinaryOperatorPrecedence(parser.current.kind)
       if precedence == 0 or precedence <= parentPrecedence:
          break
-      let binaryOperator = parser.nextToken
-      let right = parser.parseOperatorExpression(precedence)
-      result = Node(kind: binaryExpression, left: result,
-            binaryOperator: binaryOperator, right: right)
+      let previous = result
+      result = Node(kind: binaryExpression)
+      result.left = previous
+      result.binaryOperator = parser.nextToken
+      result.right = parser.parseOperatorExpression(precedence)
 
 
 func parse*(text: string): Parser =
