@@ -1,29 +1,23 @@
 import tables, strutils
-import identifiers, evaluator_ops, binder
+import identifiers, lexer, evaluator_ops, binder
+export evaluator_ops
 
 type
-   VariableKind* = enum vkValue, vkImplementation
-
    Variable* = ref object
-      case kind: VariableKind
-      of vkValue: value*: Value
-      of vkImplementation: implementation*: Bound
+      value*: Value
+      implementation*: Bound
 
    Evaluator* = ref object
       variables*: OrderedTable[string, Variable]
       parent*: Evaluator
 
 func `$`*(self: Variable): string =
-   case self.kind
-   of vkValue: return $self.value
-   of vkImplementation:
-      if self.implementation.isNil: return "[undefined]"
-      else: return "[implementation]"
+   result = $self.value
+   if not self.implementation.isNil: result &= "[implementation]"
 
 func typeStr*(self: Variable): string =
-   case self.kind
-   of vkValue: return $self.value.dtype
-   of vkImplementation: return "[func]"
+   result = $self.value.dtype
+   if not self.implementation.isNil: result &= "[implementation]"
 
 func tryLookup*(self: Evaluator, name: string): Variable =
    if name in self.variables: return self.variables[name]
@@ -31,17 +25,24 @@ func tryLookup*(self: Evaluator, name: string): Variable =
    else: raise (ref KeyError)(msg: "Undefined identifier " & escape(name))
 
 func typeVariable(base: DtypeBase): Variable =
-   Variable(kind: vkValue, value: Value(dtype: Dtype(base: ttype), valDtype: Dtype(base: base)))
+   Variable(value: Value(dtype: Dtype(base: ttype), valDtype: Dtype(base: base)))
 
 func addBaseDtypes*(self: Evaluator) =
    for dtypeBase in DtypeBase:
       self.variables[$dtypeBase] = typeVariable(dtypeBase)
 
+func toValue*(self: ValueBase): Value =
+   case self.dtypeBase
+   of tbool: return Value(dtype: Dtype(base: tbool), valBool: self.valBool)
+   of tint: return Value(dtype: Dtype(base: tint), valInt: self.valInt)
+   of tstr: return Value(dtype: Dtype(base: tstr), valStr: self.valStr)
+   else: raiseUnexpectedDtypeException($self.dtypeBase, "conversion to value")
+
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
    of boundError: return Value(dtype: Dtype(base: terror))
    of boundRoot: return Value(dtype: Dtype(base: terror))
-   of boundLiteral: return node.value
+   of boundLiteral: return node.value.toValue
    of boundIdentifier: return self.tryLookup(node.identifier.name).value
    of boundUnaryOperator:
       case node.unaryOperator
@@ -79,12 +80,12 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
    of boundDefinition:
       var value = Value(dtype: node.defDtype)
       if node.defDtype.base == tfunc:
-         let variable = Variable(kind: vkImplementation, implementation: node.defBound)
+         let variable = Variable(value: Value(dtype: node.defDtype), implementation: node.defBound)
          self.variables[node.defIdentifier.text] = variable
       else:
          if node.defBound != nil:
             value = self.evaluate(node.defBound)
-         self.variables[node.defIdentifier.text] = Variable(kind: vkValue, value: value)
+         self.variables[node.defIdentifier.text] = Variable(value: value)
       return Value(dtype: Dtype(base: tvoid))
    of boundFunctionCall:
       case node.callIdentifier.name
@@ -97,7 +98,8 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
          var scope = Evaluator(parent: self)
          for idx, p in node.callIdentifier.dtype.parameters:
             let arg = self.evaluate(node.callArguments[idx])
-            scope.variables[p.name] = Variable(kind: vkValue, value: arg)
+            scope.variables[p.name] = Variable(value: arg)
+         assert not impl.isNil
          return scope.evaluate(impl)
    of boundConditional:
       if node.condition == nil or self.evaluate(node.condition).valBool:

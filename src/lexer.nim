@@ -2,6 +2,13 @@ import strutils, tables
 import identifiers, diagnostics
 
 type
+   ValueBase* = ref object
+      case dtypeBase*: DtypeBase
+      of tbool: valBool*: bool
+      of tint: valInt*: int
+      of tstr: valStr*: string
+      else: discard
+
    TokenKind* = enum
       tokenBad = "[BAD]"
       tokenEof = "[EOF]"
@@ -65,7 +72,7 @@ type
 
    Token* = ref object
       case kind*: TokenKind
-      of tokenNumber, tokenString: value*: Value
+      of tokenNumber, tokenString: value*: ValueBase
       else: discard
       pos*: Position
       text*: string
@@ -76,6 +83,13 @@ func prettyPrint*(key, value: string): string =
    if key.len < align:
       result &= " ".repeat(align - key.len)
    result &= " " & value
+
+func `$`*(val: ValueBase): string =
+   case val.dtypeBase
+   of tbool: return $val.valBool
+   of tint: return $val.valInt
+   of tstr: return $val.valStr
+   else: return "[" & $val.dtypeBase & "]"
 
 func `$`*(token: Token): string =
    if token.isNil: return ""
@@ -154,7 +168,7 @@ func lexNumber(l: Lexer): Token =
       try: parseInt(text)
       except ValueError:
          l.diagnostics.reportCannotParseNumber(start, text); 0
-   let value = Value(dtype: Dtype(base: tint), valInt: valInt)
+   let value = ValueBase(dtypeBase: tint, valInt: valInt)
    return Token(kind: tokenNumber, pos: start, text: text, value: value)
 
 func lexWhitespace(l: Lexer): Token =
@@ -183,7 +197,7 @@ func lexString(l: Lexer): Token =
       l.diagnostics.reportUnterminatedString(start)
    let text = l.text.substr(start.abs, l.pos.abs - 1)
    let valStr = l.text.substr(start.abs+1, l.pos.abs - 2)
-   let value = Value(dtype: Dtype(base: tstr), valStr: valStr)
+   let value = ValueBase(dtypeBase: tstr, valStr: valStr)
    return Token(kind: tokenString, pos: start, text: text, value: value)
 
 func newToken(l: Lexer, kind: TokenKind, text = ""): Token =

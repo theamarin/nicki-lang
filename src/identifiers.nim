@@ -39,17 +39,6 @@ type
       pos*: Position
       dtype*: Dtype
 
-   Value* = ref object
-      pos*: Position
-      dtype*: Dtype
-      valBool*: bool
-      valInt*: int
-      valStr*: string
-      valDtype*: Dtype
-      valEnum*: int
-      structMembers*: OrderedTable[string, Value]
-
-
 
 func `==`*(l, r: Dtype): bool =
    if l.base != r.base: return false
@@ -73,17 +62,6 @@ func `$`*(dtype: Dtype): string =
    of tstruct: discard
    of tenum: discard
 
-func `$`*(val: Value): string =
-   case val.dtype.base
-   of terror: return "[error]"
-   of tvoid: return "[void]"
-   of tbool: return $val.valBool
-   of tint: return $val.valInt
-   of tstr: return $val.valStr
-   of ttype: return $val.valDtype
-   of tfunc: return "[func]"
-   of tstruct: return "[struct]"
-   of tenum: return "[enum]"
 
 func `$`*(id: Identifier): string =
    return id.name & ": " & $id.dtype

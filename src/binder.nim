@@ -29,7 +29,7 @@ type
          errorToken*: Token
       of boundRoot: discard
       of boundLiteral:
-         value*: Value
+         value*: ValueBase
          valueNode*: Node
       of boundIdentifier:
          identifier*: Identifier
@@ -141,12 +141,12 @@ func bindLiteralExpression(parent: Bound, node: Node): Bound =
    of tokenNumber:
       result.value = node.literal.value
    of tokenTrue, tokenFalse:
-      result.value = Value(dtype: result.binder.baseTypes[tbool], valBool: node.literal.kind == tokenTrue)
+      result.value = ValueBase(dtypeBase: tbool, valBool: node.literal.kind == tokenTrue)
    of tokenString:
       result.value = node.literal.value
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literal.kind))
-   result.dtype = result.value.dtype
+   result.dtype = result.binder.baseTypes[result.value.dtypeBase]
    result.valueNode = node
 
 func bindIdentifierExpression(parent: Bound, node: Node): Bound =
