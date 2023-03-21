@@ -13,11 +13,9 @@ type
 
 func `$`*(self: Variable): string =
    result = $self.value
-   if not self.implementation.isNil: result &= "[implementation]"
 
 func typeStr*(self: Variable): string =
    result = $self.value.dtype
-   if not self.implementation.isNil: result &= "[implementation]"
 
 func tryLookup*(self: Evaluator, name: string): Variable =
    if name in self.variables: return self.variables[name]

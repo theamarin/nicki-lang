@@ -29,6 +29,7 @@ type
       of tfunc:
          retDtype*: Dtype
          parameters*: seq[Identifier]
+         hasImplementation*: bool
       of tstruct:
          members*: OrderedTable[string, Dtype]
       of tenum:
@@ -58,7 +59,8 @@ func `$`*(dtype: Dtype): string =
          for idx, p in dtype.parameters:
             if idx > 0: result &= ", "
             result &= p.name & ": " & $p.dtype
-         result &= "):" & $dtype.retDtype
+         result &= "): " & $dtype.retDtype
+         if dtype.hasImplementation: result &= " = [implementation]"
    of tstruct: discard
    of tenum: discard
 

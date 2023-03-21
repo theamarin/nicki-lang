@@ -62,8 +62,8 @@ func reportUndefinedBinaryOperator*(self: var Diagnostics, pos: Position,
 func reportUndefinedIdentifier*(self: var Diagnostics, pos: Position, name: string) =
    self.report("Undefined identifier " & escape(name), pos)
 
-func reportAlreadyDefinedIdentifier*(self: var Diagnostics, pos: Position, name: string) =
-   self.report("Identifier " & escape(name) & " already defined", pos)
+func reportRedefinition*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Redefinition of " & escape(name), pos)
 
 func reportWrongIdentifier*(self: var Diagnostics, pos: Position, kindActual: string,
       kindExpected: string) =
@@ -73,6 +73,15 @@ func reportWrongNumberOfArguments*(self: var Diagnostics, pos: Position, argNumA
       argNumExpected: int) =
    self.report("Wrong number of arguments, got " & escape($argNumActual) & ", but expected " &
          escape($argNumExpected), pos)
+
+func reportMissingImplementation*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Missing implementation to call " & escape(name), pos)
+
+func reportMultipleImplementations*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Multiple implementation of function " & escape(name), pos)
+
+func reportConflictingTypes*(self: var Diagnostics, pos: Position, name: string) =
+   self.report("Conflicting types for " & escape(name), pos)
 
 func reportCannotCast*(self: var Diagnostics, pos: Position, dtypeFrom: string, dtypeTo: string) =
    self.report("Cannot cast " & escape(dtypeFrom) & " to data type " & escape(dtypeTo), pos)

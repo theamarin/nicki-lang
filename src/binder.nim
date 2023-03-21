@@ -76,9 +76,26 @@ func getScope*(self: Bound): Bound =
 func tryDeclare*(self: Bound, identifier: Identifier): bool {.discardable.} =
    let bound = self.getScope()
    if identifier.name in bound.scope:
-      self.binder.diagnostics.reportAlreadyDefinedIdentifier(identifier.pos, identifier.name)
       let existing = bound.scope[identifier.name]
-      self.binder.diagnostics.reportDefinitionHint(existing.pos, existing.name)
+      if identifier.dtype.base == tfunc:
+         if identifier.dtype != existing.dtype:
+            self.binder.diagnostics.reportConflictingTypes(identifier.pos, identifier.name)
+            self.binder.diagnostics.reportDefinitionHint(existing.pos, existing.name)
+            return false
+         elif identifier.dtype.hasImplementation:
+            if existing.dtype.hasImplementation:
+               self.binder.diagnostics.reportMultipleImplementations(identifier.pos, identifier.name)
+               self.binder.diagnostics.reportDefinitionHint(existing.pos, existing.name)
+               return false
+            else:
+               bound.scope[identifier.name] = identifier
+               return true
+         else:
+            # Allow repeated pre-declaration
+            return true
+      else:
+         self.binder.diagnostics.reportRedefinition(identifier.pos, identifier.name)
+         self.binder.diagnostics.reportDefinitionHint(existing.pos, existing.name)
       return false
    bound.scope[identifier.name] = identifier
    return true
@@ -225,6 +242,7 @@ func bindDefinitionExpression(parent: Bound, node: Node): Bound =
       else: result.defDtype.retDtype = result.binder.baseTypes[tvoid]
       if node.defAssignExpression != nil:
          result.defBound = result.bindExpression(node.defAssignExpression)
+         result.defDtype.hasImplementation = true
          if result.defBound.dtype != result.defDtype.retDtype and
                terror notin [result.defBound.dtype.base, result.defDtype.retdtype.base]:
             result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
@@ -263,6 +281,9 @@ func bindCallExpression(parent: Bound, node: Node): Bound =
       if node.callArguments.len != parameters.len:
          result.binder.diagnostics.reportWrongNumberOfArguments(result.callIdentifier.pos,
                node.callArguments.len, parameters.len)
+      elif not result.callIdentifier.dtype.hasImplementation:
+         result.binder.diagnostics.reportMissingImplementation(node.callIdentifier.pos,
+               node.callIdentifier.text)
       else:
          for idx, arg in node.callArguments:
             let argExpression = result.bindExpression(arg.callArgExpression)
