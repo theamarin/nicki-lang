@@ -27,7 +27,8 @@ type
       case kind*: BoundKind
       of boundError:
          errorToken*: Token
-      of boundRoot: discard
+      of boundRoot:
+         main*: Bound
       of boundLiteral:
          value*: ValueBase
          valueNode*: Node
@@ -379,7 +380,8 @@ func bindExpression*(bound: Bound, node: Node, requireValue = true): Bound =
       return
 
 func bindExpression*(binder: Binder, node: Node): Bound =
-   return binder.root.bindExpression(node, false)
+   binder.root.main = binder.root.bindExpression(node, false)
+   return binder.root.main
 
 func newBinder*(parent: BoundScope = nil): Binder =
    result = Binder()
