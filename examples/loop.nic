@@ -1,5 +1,5 @@
 {
-   def print(a: int): void
+   def print(a: int): void = {}
    def y: int
    while y < 10:
    {

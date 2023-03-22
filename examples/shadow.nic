@@ -1,5 +1,5 @@
 {
-   def print(a: str): void
+   def print(a: str): void = {}
    def x = "Outer scope"
    print(x)
    {

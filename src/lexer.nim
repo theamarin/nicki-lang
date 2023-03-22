@@ -30,7 +30,7 @@ type
       tokenFor = "for"
       tokenWhile = "while"
       tokenDef = "def"
-      tokenType = "type"
+      # tokenType = "type"
       tokenConst = "const"
       tokenPublic = "public"
       tokenObject = "object"
@@ -123,7 +123,7 @@ const
       ("for", tokenFor),
       ("while", tokenWhile),
       ("def", tokenDef),
-      ("type", tokenType),
+      # ("type", tokenType),
       ("const", tokenConst),
       ("public", tokenPublic),
       ("object", tokenObject),

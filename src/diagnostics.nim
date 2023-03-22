@@ -86,11 +86,11 @@ func reportConflictingTypes*(self: var Diagnostics, pos: Position, name: string)
 func reportCannotCast*(self: var Diagnostics, pos: Position, dtypeFrom: string, dtypeTo: string) =
    self.report("Cannot cast " & escape(dtypeFrom) & " to data type " & escape(dtypeTo), pos)
 
+func reportRequireValue*(self: var Diagnostics, pos: Position) =
+   self.report("Expect a non-void value", pos)
+
 func reportDefinitionHint*(self: var Diagnostics, pos: Position, name: string) =
    self.report("Hint: Definition of " & escape(name) & " was here", pos)
-
-func reportConditionNotBoolean*(self: var Diagnostics, pos: Position) =
-   self.report("Condition is not boolean", pos)
 
 func reportMissingElse*(self: var Diagnostics, pos: Position, dtype: string) =
    self.report("Missing else to return data type " & escape(dtype), pos)
@@ -99,6 +99,6 @@ func reportInconsistentConditionals*(self: var Diagnostics, pos: Position,
       conditionToken: string, conditionalDtype: string,
       otherwiseToken: string, otherwiseDtype: string) =
    self.report("Inconsistent data type in conditional expression: " &
-         escape(conditionToken) & " returns type " & escape(conditionalDtype) &
-         ", but " & escape(otherwiseToken) & " returns type " & escape(otherwiseDtype),
+         escape(conditionToken) & " evaluates to " & escape(conditionalDtype) &
+         ", but " & escape(otherwiseToken) & " evaluates to " & escape(otherwiseDtype),
          pos)

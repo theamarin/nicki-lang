@@ -101,10 +101,14 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
          return scope.evaluate(impl)
    of boundConditional:
       if node.condition == nil or self.evaluate(node.condition).valBool:
-         return self.evaluate(node.conditional)
+         var scope = Evaluator(parent: self)
+         result = scope.evaluate(node.conditional)
       elif node.otherwise != nil:
-         return self.evaluate(node.otherwise)
-      else: return Value(dtype: Dtype(base: terror))
+         var scope = Evaluator(parent: self)
+         result = scope.evaluate(node.otherwise)
+      else: return Value(dtype: Dtype(base: tvoid))
+      if node.dtype.base == tvoid:
+         return Value(dtype: Dtype(base: tvoid))
    of boundWhileLoop:
       while self.evaluate(node.whileCondition).valBool:
          discard self.evaluate(node.whileBody)

@@ -50,7 +50,7 @@ func `==`*(l, r: Dtype): bool =
 func `$`*(dtype: Dtype): string =
    result = $dtype.base
    case dtype.base
-   of terror, tvoid, tbool, tint, tstr: discard
+   of terror, basicDtypes: discard
    of ttype:
       if not dtype.dtype.isNil: result &= "<" & $dtype.dtype & ">"
    of tfunc:
@@ -63,6 +63,25 @@ func `$`*(dtype: Dtype): string =
          if dtype.hasImplementation: result &= " = [implementation]"
    of tstruct: discard
    of tenum: discard
+
+func newDtype*(base: DtypeBase, pos: Position = Position()): Dtype =
+   return Dtype(pos: pos, base: base)
+
+func newDtype*(dtype: Dtype, pos: Position = Position()): Dtype =
+   let myPos = if pos.abs != 0: pos else: dtype.pos
+   result = Dtype(base: dtype.base, pos: myPos)
+   case result.base
+   of terror, basicDtypes: discard
+   of ttype:
+      result.dtype = dtype.dtype
+   of tfunc:
+      result.retDtype = dtype.retDtype
+      result.parameters = dtype.parameters
+      result.hasImplementation = dtype.hasImplementation # tbd
+   of tstruct:
+      result.members = dtype.members
+   of tenum:
+      result.enumerals = dtype.enumerals
 
 
 func `$`*(id: Identifier): string =
