@@ -4,18 +4,36 @@ import parser, binder, evaluator, diagnostics, identifiers
 var showTree = false
 var showBind = false
 var showVars = false
+var filename = ""
 
 var myEvaluator = newEvaluator()
 var myBinder = newBinder()
 
-var filename = ""
+const helpStr = dedent """
+   nicki-lang REPL
+   Usage: nim r src/main.nim [OPTIONS] [filename]
+   Options:
+      -h, --help     Show this help
+      --parse-tree   Show parse trees
+      --bind-tree    Show bind trees
+      --show-vars    Show global-scope identifiers"""
+
+
 var p = initOptParser(commandLineParams())
 for kind, key, val in p.getopt():
    case kind
    of cmdArgument: filename = key
    of cmdLongOption, cmdShortOption:
-      echo "Error: Unknown option " & escape(key)
-      quit(QuitFailure)
+      case key
+      of "help", "h":
+         echo helpStr
+         quit(QuitSuccess)
+      of "parse-tree": showTree = true
+      of "bind-tree": showBind = true
+      of "show-vars": showVars = true
+      else:
+         echo "Error: Unknown option " & escape(key)
+         quit(QuitFailure)
    of cmdEnd: assert(false) # cannot happen
 if filename != "":
    let f = open(filename, fmRead)
@@ -23,6 +41,7 @@ if filename != "":
    f.close()
    let lines = data.splitLines()
    var parser = data.parse()
+   if showTree: echo $parser.root
    if parser.diagnostics.len > 0:
       for report in parser.diagnostics:
          writeLine(stdout, lines[report.pos.line])
@@ -30,6 +49,7 @@ if filename != "":
                filename & ":" & $report.pos)
       quit(QuitFailure)
    let bound = myBinder.bindExpression(parser.root)
+   if showBind: echo $bound
    if myBinder.diagnostics.len > 0:
       for report in myBinder.diagnostics:
          writeLine(stdout, lines[report.pos.line])
