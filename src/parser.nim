@@ -180,20 +180,19 @@ func parseDefinitionExpression(parser: var Parser): Node =
    result.defToken = parser.matchToken(tokenDef, result.kind)
    result.defIdentifier = parser.matchToken(tokenIdentifier, result.kind)
    if parser.current.kind == tokenParanthesisOpen:
+      # Function definition
       result.defParameterOpen = parser.matchToken(tokenParanthesisOpen, result.kind)
       if parser.current.kind == tokenIdentifier:
          result.defParameters.add(parser.parseParameterExpression(isFirst = true))
          while parser.current.kind == tokenComma:
             result.defParameters.add(parser.parseParameterExpression(isFirst = false))
       result.defParameterClose = parser.matchToken(tokenParanthesisClose, result.kind)
-      # Function definitions require return type specification
-      result.defColon = parser.matchToken(tokenColon, result.kind)
-      result.defDtype = parser.matchToken(tokenIdentifier, result.kind)
-   elif parser.current.kind == tokenColon:
-      # Variable definitios have optional type specification
+   if parser.current.kind == tokenColon:
+      # Optional return type specification
       result.defColon = parser.matchToken(tokenColon, result.kind)
       result.defDtype = parser.matchToken(tokenIdentifier, result.kind)
    if parser.current.kind == tokenEquals:
+      # Initialization
       result.defAssignToken = parser.matchToken(tokenEquals, result.kind)
       if result.defParameterClose != nil:
          result.defAssignExpression = parser.parseBlockExpression()
