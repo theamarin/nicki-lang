@@ -141,7 +141,9 @@ func `$`*(bound: Bound): string =
 
 func toDtype*(bound: Bound, dtypeToken: Token): Dtype =
    let id = bound.tryLookup(dtypeToken.text)
-   if id == nil: return newDtype(terror, bound.pos)
+   if id == nil:
+      bound.binder.diagnostics.reportUndefinedIdentifier(dtypeToken.pos, dtypeToken.text)
+      return newDtype(terror, bound.pos)
    elif id.dtype.base != ttype:
       bound.binder.diagnostics.reportWrongIdentifier(dtypeToken.pos, $id.dtype.base, $ttype)
    else: return newDtype(id.dtype.dtype)
@@ -231,9 +233,6 @@ func bindVariableDefinitonExpression(parent: Bound, node: Node): Bound =
    result.dtype = newDtype(tvoid)
    if node.defDtype != nil:
       result.defDtype = result.toDtype(node.defDtype)
-      if result.defDtype.base == terror:
-         result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
-               node.defDtype.text)
    if node.defAssignExpression != nil:
       result.defBound = result.bindExpression(node.defAssignExpression)
       if result.defDtype.isNil:
@@ -256,9 +255,6 @@ func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
       result.tryDeclare(p)
    if node.defDtype != nil:
       result.defDtype.retDtype = result.toDtype(node.defDtype)
-      if result.defDtype.retDtype.base == terror:
-         result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
-               node.defDtype.text)
    else: result.defDtype.retDtype = newDtype(tvoid)
    if node.defAssignExpression != nil:
       result.defBound = result.bindExpression(node.defAssignExpression)
