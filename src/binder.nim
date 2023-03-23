@@ -223,45 +223,57 @@ func bindParameter(bound: Bound, node: Node): Identifier =
       bound.binder.diagnostics.reportUndefinedIdentifier(node.parameterDtype.pos,
             node.parameterDtype.text)
 
-func bindDefinitionExpression(parent: Bound, node: Node): Bound =
+func bindVariableDefinitonExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
+   assert node.defParameterOpen == nil
    result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
    result.defIdentifier = node.defIdentifier
    result.dtype = newDtype(tvoid)
-   let isFunc = node.defParameterOpen != nil
-   if isFunc:
-      result.defDtype = newDtype(tfunc)
-      result.scope = BoundScope()
-      for parameter in node.defParameters:
-         let p = result.bindParameter(parameter)
-         result.defDtype.parameters.add(p)
-         result.tryDeclare(p)
-      if node.defDtype != nil:
-         result.defDtype.retDtype = result.toDtype(node.defDtype)
-         if result.defDtype.retDtype.base == terror:
-            result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
-                  node.defDtype.text)
-      else: result.defDtype.retDtype = newDtype(tvoid)
-      if node.defAssignExpression != nil:
-         result.defBound = result.bindExpression(node.defAssignExpression)
-         result.defDtype.hasImplementation = true
-         if result.defBound.dtype != result.defDtype.retDtype and
-               terror notin [result.defBound.dtype.base, result.defDtype.retdtype.base]:
-            result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
-                  $result.defBound.dtype, $result.defDtype.retDtype)
+   if node.defDtype != nil:
+      result.defDtype = result.toDtype(node.defDtype)
+      if result.defDtype.base == terror:
+         result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
+               node.defDtype.text)
+   if node.defAssignExpression != nil:
+      result.defBound = result.bindExpression(node.defAssignExpression)
+      if result.defDtype.isNil:
+         result.defDtype = result.defBound.dtype
+      elif result.defDtype != result.defBound.dtype:
+         result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
+               $result.defBound.dtype, $result.defDtype)
+
+func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
+   assert node.kind == definitionExpression
+   assert node.defParameterOpen != nil
+   result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
+   result.defIdentifier = node.defIdentifier
+   result.dtype = newDtype(tvoid)
+   result.defDtype = newDtype(tfunc)
+   result.scope = BoundScope()
+   for parameter in node.defParameters:
+      let p = result.bindParameter(parameter)
+      result.defDtype.parameters.add(p)
+      result.tryDeclare(p)
+   if node.defDtype != nil:
+      result.defDtype.retDtype = result.toDtype(node.defDtype)
+      if result.defDtype.retDtype.base == terror:
+         result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
+               node.defDtype.text)
+   else: result.defDtype.retDtype = newDtype(tvoid)
+   if node.defAssignExpression != nil:
+      result.defBound = result.bindExpression(node.defAssignExpression)
+      result.defDtype.hasImplementation = true
+      if result.defBound.dtype != result.defDtype.retDtype and
+            terror notin [result.defBound.dtype.base, result.defDtype.retdtype.base]:
+         result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
+               $result.defBound.dtype, $result.defDtype.retDtype)
+
+func bindDefinitionExpression(parent: Bound, node: Node): Bound =
+   assert node.kind == definitionExpression
+   if node.defParameterOpen == nil:
+      result = bindVariableDefinitonExpression(parent, node)
    else:
-      if node.defDtype != nil:
-         result.defDtype = result.toDtype(node.defDtype)
-         if result.defDtype.base == terror:
-            result.binder.diagnostics.reportUndefinedIdentifier(node.defDtype.pos,
-                  node.defDtype.text)
-      if node.defAssignExpression != nil:
-         result.defBound = result.bindExpression(node.defAssignExpression)
-         if result.defDtype.isNil:
-            result.defDtype = result.defBound.dtype
-         elif result.defDtype != result.defBound.dtype:
-            result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
-                  $result.defBound.dtype, $result.defDtype)
+      result = bindFunctionDefinitionExpression(parent, node)
    let identifier = Identifier(name: node.defIdentifier.text, dtype: result.defDtype,
          pos: node.defToken.pos)
    parent.tryDeclare(identifier)
