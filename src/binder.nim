@@ -349,8 +349,6 @@ func bindBlockExpression(parent: Bound, node: Node): Bound =
    for expression in node.blockExpressions:
       result.blockExpressions.add(result.bindExpression(expression, requireValue = false))
    result.dtype = newDtype(tvoid)
-   if result.blockExpressions.len > 0:
-      result.dtype = newDtype(result.blockExpressions[^1].dtype)
 
 
 func bindExpression*(bound: Bound, node: Node, requireValue = true): Bound =
