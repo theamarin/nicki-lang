@@ -102,3 +102,6 @@ func reportInconsistentConditionals*(self: var Diagnostics, pos: Position,
          escape(conditionToken) & " evaluates to " & escape(conditionalDtype) &
          ", but " & escape(otherwiseToken) & " evaluates to " & escape(otherwiseDtype),
          pos)
+
+func reportReturnOutsideFunction*(self: var Diagnostics, pos: Position) =
+   self.report("Return keyword can only be used in the context of a function", pos)

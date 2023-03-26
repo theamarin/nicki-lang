@@ -10,6 +10,10 @@ type
    Evaluator* = ref object
       variables*: OrderedTable[string, Variable]
       parent*: Evaluator
+      context*: Evaluator
+
+   ReturnException = object of CatchableError
+      result: Value
 
 func `$`*(self: Variable): string =
    result = $self.value
@@ -78,11 +82,11 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
    of boundDefinition:
       var value = Value(dtype: node.defDtype)
       if node.defDtype.base == tfunc:
-         let variable = Variable(value: Value(dtype: node.defDtype), implementation: node.defBound)
+         let variable = Variable(value: Value(dtype: node.defDtype), implementation: node.defBody)
          self.variables[node.defIdentifier.text] = variable
       else:
-         if node.defBound != nil:
-            value = self.evaluate(node.defBound)
+         if node.defBody != nil:
+            value = self.evaluate(node.defBody)
          self.variables[node.defIdentifier.text] = Variable(value: value)
       return Value(dtype: Dtype(base: tvoid))
    of boundFunctionCall:
@@ -98,7 +102,11 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
             let arg = self.evaluate(node.callArguments[idx])
             scope.variables[p.name] = Variable(value: arg)
          assert not impl.isNil
-         return scope.evaluate(impl)
+         try:
+            result = scope.evaluate(impl)
+         except ReturnException as e:
+            result = e.result
+         return result
    of boundConditional:
       if node.condition == nil or self.evaluate(node.condition).valBool:
          var scope = Evaluator(parent: self)
@@ -113,6 +121,10 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       while self.evaluate(node.whileCondition).valBool:
          discard self.evaluate(node.whileBody)
       return Value(dtype: Dtype(base: tvoid))
+   of boundReturn:
+      if node.returnExpr.isNil: raise (ref ReturnException)(result: Value(dtype: newDtype(tvoid)))
+      result = self.evaluate(node.returnExpr)
+      raise (ref ReturnException)(result: result)
    of boundBlock:
       var scope = Evaluator(parent: self)
       var lastValue = Value(dtype: Dtype(base: tvoid))

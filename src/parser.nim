@@ -18,6 +18,7 @@ type
       callExpression = "call expression"
       conditionalExpression = "conditional expression"
       whileExpression = "while expression"
+      returnExpression = "return expression"
       blockExpression = "block expression"
       compilationUnit = "compilation unit"
 
@@ -76,6 +77,9 @@ type
          whileCondition*: Node
          whileColon*: Token
          whileBody*: Node
+      of returnExpression:
+         returnToken*: Token
+         returnExpr*: Node
       of blockExpression:
          blockStart*: Token
          blockExpressions*: seq[Node]
@@ -160,6 +164,13 @@ func parseWhileExpression(parser: var Parser): Node =
    result.whileColon = parser.matchToken(tokenColon, result.kind)
    result.whileBody = parser.parseExpression()
 
+func parseReturnExpression(parser: var Parser): Node =
+   result = Node(kind: returnExpression)
+   result.returnToken = parser.matchToken(tokenReturn, result.kind)
+   let hasExpr = parser.current.kind != tokenEof and
+      (parser.current.pos.line == result.returnToken.pos.line)
+   if hasExpr: result.returnExpr = parser.parseExpression()
+
 func parseBlockExpression(parser: var Parser): Node =
    result = Node(kind: blockExpression)
    result.blockStart = parser.matchToken(tokenBraceOpen, result.kind)
@@ -229,27 +240,30 @@ func parseCallExpression(parser: var Parser): Node =
    result.callParenthesisClose = parser.matchToken(tokenParanthesisClose, result.kind)
 
 func parsePrimaryExpression(parser: var Parser): Node =
-   if parser.current.kind == tokenParanthesisOpen:
+   case parser.current.kind
+   of tokenParanthesisOpen:
       result = Node(kind: paranthesisExpression)
       result.open = parser.nextToken()
       result.expression = parser.parseOperatorExpression()
       result.close = parser.matchToken(tokenParanthesisClose, result.kind)
-   elif parser.current.kind in literalTokens:
+   of literalTokens:
       result = Node(kind: literalExpression)
       result.literal = parser.nextToken()
-   elif parser.current.kind == tokenIdentifier:
+   of tokenIdentifier:
       if parser.peek.kind == tokenParanthesisOpen:
          return parser.parseCallExpression()
       else:
          let token = parser.nextToken()
          return Node(kind: identifierExpression, identifier: token)
-   elif parser.current.kind == tokenDef:
+   of tokenDef:
       return parser.parseDefinitionExpression()
-   elif parser.current.kind == tokenIf:
+   of tokenIf:
       return parser.parseConditionalExpression()
-   elif parser.current.kind == tokenWhile:
+   of tokenWhile:
       return parser.parseWhileExpression()
-   elif parser.current.kind == tokenBraceOpen:
+   of tokenReturn:
+      return parser.parseReturnExpression()
+   of tokenBraceOpen:
       return parser.parseBlockExpression()
    else:
       let expectedKinds = {tokenParanthesisOpen, tokenTrue, tokenFalse, tokenNumber,
