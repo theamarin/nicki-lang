@@ -1,5 +1,5 @@
 import strutils, tables, parseopt, os
-import parser, binder, evaluator, diagnostics, identifiers
+import parser, binder, evaluator, diagnostics, identifiers, lowerer
 
 var showTree = false
 var showBind = false
@@ -56,7 +56,9 @@ if filename != "":
          writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
                filename & ":" & $report.pos)
       quit(QuitFailure)
-   let result = myEvaluator.evaluate(bound)
+   let lowered = bound.lower()
+   if showBind: echo $lowered
+   let result = myEvaluator.evaluate(lowered)
    if result.dtype.base != tvoid: writeline(stdout, $result)
    quit(QuitSuccess)
 
@@ -98,6 +100,8 @@ while true:
       myBinder.diagnostics.clear
       myBinder.root.scope.identifiers = identifiersBackup # Reset scope on error
       continue
+   let lowered = bound.lower()
+   if showBind: echo $lowered
 
-   let result = myEvaluator.evaluate(bound)
+   let result = myEvaluator.evaluate(lowered)
    if result.dtype.base != tvoid: writeline(stdout, $result)

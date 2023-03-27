@@ -82,11 +82,11 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
    of boundDefinition:
       var value = Value(dtype: node.defDtype)
       if node.defDtype.base == tfunc:
-         let variable = Variable(value: Value(dtype: node.defDtype), implementation: node.defBody)
+         let variable = Variable(value: Value(dtype: node.defDtype), implementation: node.defInitialization)
          self.variables[node.defIdentifier.text] = variable
       else:
-         if node.defBody != nil:
-            value = self.evaluate(node.defBody)
+         if node.defInitialization != nil:
+            value = self.evaluate(node.defInitialization)
          self.variables[node.defIdentifier.text] = Variable(value: value)
       return Value(dtype: Dtype(base: tvoid))
    of boundFunctionCall:

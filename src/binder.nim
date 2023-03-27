@@ -50,7 +50,7 @@ type
       of boundDefinition:
          defIdentifier*: Token
          defDtype*: Dtype
-         defBody*: Bound
+         defInitialization*: Bound
       of boundFunctionCall:
          callIdentifier*: Identifier
          callArguments*: seq[Bound]
@@ -252,12 +252,12 @@ func bindVariableDefinitonExpression(parent: Bound, node: Node): Bound =
    if node.defDtype != nil:
       result.defDtype = result.toDtype(node.defDtype)
    if node.defAssignExpression != nil:
-      result.defBody = result.bindExpression(node.defAssignExpression)
+      result.defInitialization = result.bindExpression(node.defAssignExpression)
       if result.defDtype.isNil:
-         result.defDtype = result.defBody.dtype
-      elif result.defDtype != result.defBody.dtype:
+         result.defDtype = result.defInitialization.dtype
+      elif result.defDtype != result.defInitialization.dtype:
          result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
-               $result.defBody.dtype, $result.defDtype)
+               $result.defInitialization.dtype, $result.defDtype)
 
 func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
@@ -275,12 +275,12 @@ func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
       result.defDtype.retDtype = result.toDtype(node.defDtype)
    else: result.defDtype.retDtype = newDtype(tvoid)
    if node.defAssignExpression != nil:
-      result.defBody = result.bindBlockExpression(node.defAssignExpression)
+      result.defInitialization = result.bindBlockExpression(node.defAssignExpression)
       result.defDtype.hasImplementation = true
-      # if result.defBody.dtype != result.defDtype.retDtype and
-      #       terror notin [result.defBody.dtype.base, result.defDtype.retdtype.base]:
+      # if result.defInitialization.dtype != result.defDtype.retDtype and
+      #       terror notin [result.defInitialization.dtype.base, result.defDtype.retdtype.base]:
       #    result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
-      #          $result.defBody.dtype, $result.defDtype.retDtype)
+      #          $result.defInitialization.dtype, $result.defDtype.retDtype)
 
 func bindDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
