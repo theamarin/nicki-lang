@@ -1,5 +1,6 @@
 import strutils, tables
 import parser, lexer, binder_ops, identifiers, diagnostics
+export binder_ops
 
 
 type

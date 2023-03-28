@@ -41,7 +41,7 @@ type
       dtype*: Dtype
 
 func hash*(self: Identifier): Hash =
-   return cast[pointer](self.addr).hash
+   return cast[pointer](self).hash
 
 func `==`*(l, r: Dtype): bool =
    if l.base != r.base: return false
