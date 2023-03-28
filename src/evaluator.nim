@@ -12,9 +12,6 @@ type
       parent*: Evaluator
       context*: Evaluator
 
-   ReturnException = object of CatchableError
-      result: Value
-
 func `$`*(self: Variable): string =
    result = $self.value
 
@@ -70,7 +67,7 @@ func evaluateBinaryOperator(self: var Evaluator, node: Bound): Value =
    of boundBinaryLogicalXor: return left xor right
 
 
-func evaluateBlock*(self: var Evaluator, node: Bound) =
+func evaluateBlock*(self: var Evaluator, node: Bound): Value =
    assert node.kind == boundBlock
    var scope = Evaluator(parent: self)
    var labelToIndex = newTable[string, int]()
@@ -91,11 +88,12 @@ func evaluateBlock*(self: var Evaluator, node: Bound) =
       of boundLabel:
          discard
       of boundReturn:
-         discard
+         if expression.returnExpr.isNil: return Value(dtype: newDtype(tvoid))
+         else: return self.evaluate(expression.returnExpr)
       else:
          discard self.evaluate(expression)
       index.inc()
-
+   return Value(dtype: newDtype(tvoid))
 
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
@@ -139,10 +137,7 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
             let arg = self.evaluate(node.callArguments[idx])
             scope.variables[p] = Variable(value: arg)
          assert not impl.isNil
-         try:
-            result = scope.evaluate(impl)
-         except ReturnException as e:
-            result = e.result
+         result = scope.evaluate(impl)
          return result
    of boundConditional:
       if node.condition == nil or self.evaluate(node.condition).valBool:
@@ -158,13 +153,8 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       while self.evaluate(node.whileCondition).valBool:
          discard self.evaluate(node.whileBody)
       return Value(dtype: Dtype(base: tvoid))
-   of boundReturn:
-      if node.returnExpr.isNil: raise (ref ReturnException)(result: Value(dtype: newDtype(tvoid)))
-      result = self.evaluate(node.returnExpr)
-      raise (ref ReturnException)(result: result)
    of boundBlock:
-      self.evaluateBlock(node)
-      return Value(dtype: Dtype(base: tvoid))
+      return self.evaluateBlock(node)
    else:
       raise (ref KeyError)(msg: "Cannot evaluate node " & escape($node.kind))
 
