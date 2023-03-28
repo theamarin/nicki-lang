@@ -6,8 +6,8 @@ var showBind = false
 var showVars = false
 var filename = ""
 
-var myEvaluator = newEvaluator()
 var myBinder = newBinder()
+var myEvaluator = newEvaluator(myBinder)
 
 const helpStr = dedent """
    nicki-lang REPL

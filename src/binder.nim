@@ -4,23 +4,27 @@ import parser, lexer, binder_ops, identifiers, diagnostics
 
 type
    BoundKind* = enum
-      boundError = "error bound"
-      boundRoot = "root bound"
-      boundLiteral = "literal bound"
-      boundIdentifier = "identifier bound"
-      boundUnaryOperator = "unary bound"
-      boundBinaryOperator = "binary bound"
-      boundAssignment = "assignment bound"
-      boundDefinition = "definition bound"
-      boundFunctionCall = "function call bound"
-      boundConditional = "conditional bound"
-      boundWhileLoop = "while bound"
-      boundReturn = "return bound"
-      boundBlock = "block bound"
+      boundError = "error"
+      boundRoot = "root"
+      boundLiteral = "literal"
+      boundIdentifier = "identifier"
+      boundUnaryOperator = "unary"
+      boundBinaryOperator = "binary"
+      boundAssignment = "assignment"
+      boundDefinition = "definition"
+      boundFunctionCall = "function call"
+      boundConditional = "conditional"
+      boundWhileLoop = "while"
+      boundReturn = "return"
+      boundBlock = "block"
+      boundLabel = "label"
+      boundGoto = "goto"
+      boundConditionalGoto = "conditional goto"
 
    BoundScope* = ref object
       context*: Bound
       identifiers*: OrderedTable[string, Identifier]
+      labelCount*: int
 
    Bound* = ref object
       scope*: BoundScope
@@ -45,10 +49,10 @@ type
          binaryLeft*: Bound
          binaryRight*: Bound
       of boundAssignment:
-         lvalue*: Token
+         lvalue*: Identifier
          rvalue*: Bound
       of boundDefinition:
-         defIdentifier*: Token
+         defIdentifier*: Identifier
          defDtype*: Dtype
          defInitialization*: Bound
       of boundFunctionCall:
@@ -66,6 +70,11 @@ type
          returnExpr*: Bound # may be nil
       of boundBlock:
          blockExpressions*: seq[Bound]
+      of boundLabel, boundGoto:
+         label*: string
+      of boundConditionalGoto:
+         gotoCondition*: Bound
+         gotoLabel*: string
 
    Binder* = ref object
       root*: Bound
@@ -223,14 +232,13 @@ func bindAssignmentExpression(parent: Bound, node: Node): Bound =
    assert node.kind == assignmentExpression
    assert node.lvalue.kind == tokenIdentifier
    result = Bound(kind: boundAssignment, parent: parent, binder: parent.binder)
-   result.lvalue = node.lvalue
+   result.lvalue = result.tryLookup(node.lvalue.text)
    result.rvalue = result.bindExpression(node.rvalue)
-   let identifier = result.tryLookup(node.lvalue.text)
-   if identifier == nil:
+   if result.lvalue == nil:
       result.binder.diagnostics.reportUndefinedIdentifier(node.lvalue.pos, node.lvalue.text)
-   elif identifier.dtype != result.rvalue.dtype:
+   elif result.lvalue.dtype != result.rvalue.dtype:
       result.binder.diagnostics.reportCannotCast(node.assignment.pos, $result.rvalue.dtype,
-            $identifier.dtype)
+            $result.lvalue.dtype)
    result.dtype = result.rvalue.dtype
 
 func bindParameter(bound: Bound, node: Node): Identifier =
@@ -247,7 +255,6 @@ func bindVariableDefinitonExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
    assert node.defParameterOpen == nil
    result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
-   result.defIdentifier = node.defIdentifier
    result.dtype = newDtype(tvoid)
    if node.defDtype != nil:
       result.defDtype = result.toDtype(node.defDtype)
@@ -263,7 +270,6 @@ func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
    assert node.defParameterOpen != nil
    result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
-   result.defIdentifier = node.defIdentifier
    result.dtype = newDtype(tvoid)
    result.defDtype = newDtype(tfunc)
    result.scope = BoundScope(context: result)
@@ -288,9 +294,9 @@ func bindDefinitionExpression(parent: Bound, node: Node): Bound =
       result = bindVariableDefinitonExpression(parent, node)
    else:
       result = bindFunctionDefinitionExpression(parent, node)
-   let identifier = Identifier(name: node.defIdentifier.text, dtype: result.defDtype,
+   result.defIdentifier = Identifier(name: node.defIdentifier.text, dtype: result.defDtype,
          pos: node.defToken.pos)
-   parent.tryDeclare(identifier)
+   parent.tryDeclare(result.defIdentifier)
 
 func bindCallExpression(parent: Bound, node: Node): Bound =
    assert node.kind == callExpression

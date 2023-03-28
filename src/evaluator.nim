@@ -8,7 +8,7 @@ type
       implementation*: Bound
 
    Evaluator* = ref object
-      variables*: OrderedTable[string, Variable]
+      variables*: OrderedTable[Identifier, Variable]
       parent*: Evaluator
       context*: Evaluator
 
@@ -21,17 +21,18 @@ func `$`*(self: Variable): string =
 func typeStr*(self: Variable): string =
    result = $self.value.dtype
 
-func tryLookup*(self: Evaluator, name: string): Variable =
-   if name in self.variables: return self.variables[name]
-   elif not self.parent.isNil: return self.parent.tryLookup(name)
-   else: raise (ref KeyError)(msg: "Undefined identifier " & escape(name))
+func tryLookup*(self: Evaluator, identifier: Identifier): Variable =
+   if identifier in self.variables: return self.variables[identifier]
+   elif not self.parent.isNil: return self.parent.tryLookup(identifier)
+   else: raise (ref KeyError)(msg: "Undefined identifier " & escape(identifier.name))
 
 func typeVariable(base: DtypeBase): Variable =
    Variable(value: Value(dtype: Dtype(base: ttype), valDtype: Dtype(base: base)))
 
-func addBaseDtypes*(self: Evaluator) =
+func addBaseDtypes*(self: Evaluator, bound: Bound) =
    for dtypeBase in DtypeBase:
-      self.variables[$dtypeBase] = typeVariable(dtypeBase)
+      let identifier = bound.scope.identifiers[$dtypeBase]
+      self.variables[identifier] = typeVariable(dtypeBase)
 
 func toValue*(self: ValueBase): Value =
    case self.dtypeBase
@@ -40,54 +41,90 @@ func toValue*(self: ValueBase): Value =
    of tstr: return Value(dtype: Dtype(base: tstr), valStr: self.valStr)
    else: raiseUnexpectedDtypeException($self.dtypeBase, "conversion to value")
 
+
+func evaluate*(self: var Evaluator, node: Bound): Value
+
+func evaluateBinaryOperator(self: var Evaluator, node: Bound): Value =
+   assert node.kind == boundBinaryOperator
+   let left = self.evaluate(node.binaryLeft)
+   let right = self.evaluate(node.binaryRight)
+   case node.binaryOperator
+   of boundBinaryAddition: return left + right
+   of boundBinarySubtraction: return left - right
+   of boundBinaryMultiplication: return left * right
+   of boundBinaryDivision: return left div right
+   of boundBinaryEquals: return left == right
+   of boundBinaryNotEquals: return left != right
+   of boundBinaryGreaterThan: return left > right
+   of boundBinaryGreaterEquals: return left >= right
+   of boundBinaryLessThan: return left < right
+   of boundBinaryLessEquals: return left <= right
+   of boundBinaryCombinedComparison:
+      let res: int =
+         if (left > right).valBool: 1
+         elif (left < right).valBool: -1
+         else: 0
+      return Value(dtype: Dtype(base: tint), valInt: res)
+   of boundBinaryLogicalAnd: return left and right
+   of boundBinaryLogicalOr: return left or right
+   of boundBinaryLogicalXor: return left xor right
+
+
+func evaluateBlock*(self: var Evaluator, node: Bound) =
+   assert node.kind == boundBlock
+   var scope = Evaluator(parent: self)
+   var labelToIndex = newTable[string, int]()
+   for index, expression in node.blockExpressions:
+      if expression.kind == boundLabel:
+         labelToIndex[expression.label] = index
+
+   var index = 0
+   while index < node.blockExpressions.len:
+      var expression = node.blockExpressions[index]
+      case expression.kind
+      of boundGoto:
+         index = labelToIndex[node.label]
+      of boundConditionalGoto:
+         let condition = scope.evaluate(expression)
+         if condition.valBool:
+            index = labelToIndex[expression.gotoLabel]
+      of boundLabel:
+         discard
+      of boundReturn:
+         discard
+      else:
+         discard self.evaluate(expression)
+      index.inc()
+
+
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind
    of boundError: return Value(dtype: Dtype(base: terror))
    of boundRoot: return Value(dtype: Dtype(base: terror))
    of boundLiteral: return node.value.toValue
-   of boundIdentifier: return self.tryLookup(node.identifier.name).value
+   of boundIdentifier: return self.tryLookup(node.identifier).value
    of boundUnaryOperator:
       case node.unaryOperator
       of boundUnaryPlus: return self.evaluate(node.unaryOperand)
       of boundUnaryMinus: return self.evaluate(node.unaryOperand).negative
       of boundUnaryNot: return self.evaluate(node.unaryOperand).logicalNot
    of boundBinaryOperator:
-      let left = self.evaluate(node.binaryLeft)
-      let right = self.evaluate(node.binaryRight)
-      case node.binaryOperator
-      of boundBinaryAddition: return left + right
-      of boundBinarySubtraction: return left - right
-      of boundBinaryMultiplication: return left * right
-      of boundBinaryDivision: return left div right
-      of boundBinaryEquals: return left == right
-      of boundBinaryNotEquals: return left != right
-      of boundBinaryGreaterThan: return left > right
-      of boundBinaryGreaterEquals: return left >= right
-      of boundBinaryLessThan: return left < right
-      of boundBinaryLessEquals: return left <= right
-      of boundBinaryCombinedComparison:
-         let res: int =
-            if (left > right).valBool: 1
-            elif (left < right).valBool: -1
-            else: 0
-         return Value(dtype: Dtype(base: tint), valInt: res)
-      of boundBinaryLogicalAnd: return left and right
-      of boundBinaryLogicalOr: return left or right
-      of boundBinaryLogicalXor: return left xor right
+      return self.evaluateBinaryOperator(node)
    of boundAssignment:
       let rvalue = self.evaluate(node.rvalue)
-      let variable = self.tryLookup(node.lvalue.text)
+      let variable = self.tryLookup(node.lvalue)
       variable.value = rvalue
       return rvalue
    of boundDefinition:
       var value = Value(dtype: node.defDtype)
       if node.defDtype.base == tfunc:
-         let variable = Variable(value: Value(dtype: node.defDtype), implementation: node.defInitialization)
-         self.variables[node.defIdentifier.text] = variable
+         let variable = Variable(value: Value(dtype: node.defDtype),
+               implementation: node.defInitialization)
+         self.variables[node.defIdentifier] = variable
       else:
          if node.defInitialization != nil:
             value = self.evaluate(node.defInitialization)
-         self.variables[node.defIdentifier.text] = Variable(value: value)
+         self.variables[node.defIdentifier] = Variable(value: value)
       return Value(dtype: Dtype(base: tvoid))
    of boundFunctionCall:
       case node.callIdentifier.name
@@ -96,11 +133,11 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
          debugEcho $val
          return Value(dtype: Dtype(base: tvoid))
       else:
-         let impl = self.tryLookup(node.callIdentifier.name).implementation
+         let impl = self.tryLookup(node.callIdentifier).implementation
          var scope = Evaluator(parent: self)
          for idx, p in node.callIdentifier.dtype.parameters:
             let arg = self.evaluate(node.callArguments[idx])
-            scope.variables[p.name] = Variable(value: arg)
+            scope.variables[p] = Variable(value: arg)
          assert not impl.isNil
          try:
             result = scope.evaluate(impl)
@@ -126,12 +163,11 @@ func evaluate*(self: var Evaluator, node: Bound): Value =
       result = self.evaluate(node.returnExpr)
       raise (ref ReturnException)(result: result)
    of boundBlock:
-      var scope = Evaluator(parent: self)
-      var lastValue = Value(dtype: Dtype(base: tvoid))
-      for expression in node.blockExpressions:
-         lastValue = scope.evaluate(expression)
-      return lastValue
+      self.evaluateBlock(node)
+      return Value(dtype: Dtype(base: tvoid))
+   else:
+      raise (ref KeyError)(msg: "Cannot evaluate node " & escape($node.kind))
 
-func newEvaluator*(): Evaluator =
+func newEvaluator*(binder: Binder): Evaluator =
    result = Evaluator()
-   result.addBaseDtypes()
+   result.addBaseDtypes(binder.root)

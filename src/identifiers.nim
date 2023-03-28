@@ -1,4 +1,4 @@
-import tables
+import tables, hashes
 import diagnostics
 
 type
@@ -40,6 +40,8 @@ type
       pos*: Position
       dtype*: Dtype
 
+func hash*(self: Identifier): Hash =
+   return cast[pointer](self.addr).hash
 
 func `==`*(l, r: Dtype): bool =
    if l.base != r.base: return false

@@ -2,42 +2,33 @@ import binder
 
 func lower*(bound: Bound): Bound
 
-func lowerBoundError(bound: Bound): Bound =
-   return bound
-
-func lowerBoundRoot(bound: Bound): Bound =
+func lowerRoot(bound: Bound): Bound =
    return bound.main.lower()
 
-func lowerBoundLiteral(bound: Bound): Bound =
-   return bound
-
-func lowerBoundIdentifier(bound: Bound): Bound =
-   return bound
-
-func lowerBoundUnaryOperator(bound: Bound): Bound =
+func lowerUnaryOperator(bound: Bound): Bound =
    let operand = bound.unaryOperand.lower()
    if operand == bound.unaryOperand: return bound
    return Bound(kind: boundUnaryOperator, unaryOperator: bound.unaryOperator, unaryOperand: operand)
 
-func lowerBoundBinaryOperator(bound: Bound): Bound =
+func lowerBinaryOperator(bound: Bound): Bound =
    let left = bound.binaryLeft.lower()
    let right = bound.binaryRight.lower()
    if left == bound.binaryLeft and right == bound.binaryRight: return bound
    return Bound(kind: boundBinaryOperator, binaryLeft: left, binaryOperator: bound.binaryOperator,
          binaryRight: right)
 
-func lowerBoundAssignment(bound: Bound): Bound =
+func lowerAssignment(bound: Bound): Bound =
    let rvalue = bound.rvalue.lower()
    if rvalue == bound.rvalue: return bound
    return Bound(kind: boundAssignment, lvalue: bound.lvalue, rvalue: rvalue)
 
-func lowerBoundDefinition(bound: Bound): Bound =
+func lowerDefinition(bound: Bound): Bound =
    let initialization = bound.defInitialization.lower()
    if initialization == bound.defInitialization: return bound
    return Bound(kind: boundDefinition, defIdentifier: bound.defIdentifier, defDtype: bound.defDtype,
          defInitialization: initialization)
 
-func lowerBoundFunctionCall(bound: Bound): Bound =
+func lowerFunctionCall(bound: Bound): Bound =
    var newArguments = newSeq[Bound](bound.callArguments.len())
    var dirty = false
    for arg in bound.callArguments:
@@ -48,7 +39,7 @@ func lowerBoundFunctionCall(bound: Bound): Bound =
    return Bound(kind: boundFunctionCall, callIdentifier: bound.callIdentifier,
          callArguments: newArguments)
 
-func lowerBoundConditional(bound: Bound): Bound =
+func lowerConditional(bound: Bound): Bound =
    let condition = bound.condition.lower()
    let conditional = bound.conditional.lower()
    let otherwise = bound.otherwise.lower()
@@ -57,18 +48,32 @@ func lowerBoundConditional(bound: Bound): Bound =
    return Bound(kind: boundConditional, conditionToken: bound.conditionToken, condition: condition,
          conditional: conditional, otherwise: otherwise)
 
-func lowerBoundWhileLoop(bound: Bound): Bound =
+func lowerWhileLoop(bound: Bound): Bound =
    let condition = bound.whileCondition.lower()
    let body = bound.whileBody.lower()
    if condition == bound.whileCondition and body == bound.whileBody: return bound
    return Bound(kind: boundWhileLoop, whileCondition: condition, whileBody: body)
 
-func lowerBoundReturn(bound: Bound): Bound =
+func lowerReturn(bound: Bound): Bound =
    let returnExpr = bound.returnExpr.lower()
    if returnExpr == bound.returnExpr: return bound
    return Bound(kind: boundReturn, returnExpr: returnExpr)
 
-func lowerBoundBlock(bound: Bound): Bound =
+func flattenBlock(bound: Bound): Bound =
+   var newExpressions: seq[Bound]
+   var stack: seq[Bound]
+   stack.add(bound)
+   while stack.len > 0:
+      var current = stack.pop()
+      let currentLen = stack.len()
+      if current.kind == boundBlock:
+         for s in current.blockExpressions:
+            stack.insert(s, currentLen)
+      else:
+         newExpressions.add(current)
+   result = Bound(kind: boundBlock, blockExpressions: newExpressions)
+
+func lowerBlock(bound: Bound): Bound =
    var newExpressions = newSeq[Bound](bound.blockExpressions.len())
    var dirty = false
    for expression in bound.blockExpressions:
@@ -76,38 +81,43 @@ func lowerBoundBlock(bound: Bound): Bound =
       if newExpression != expression: dirty = true
       newExpressions.add(newExpression)
    if not dirty: return bound
-   return Bound(kind: boundBlock, blockExpressions: newExpressions)
+   result = Bound(kind: boundBlock, blockExpressions: newExpressions)
+   return flattenBlock(result)
+
+func lowerConditionalGoto(bound: Bound): Bound =
+   let condition = bound.gotoCondition.lower()
+   if condition == bound.condition: return bound
+   return Bound(kind: boundConditionalGoto, gotoCondition: condition)
 
 func lower*(bound: Bound): Bound =
    if bound.isNil: return nil
    case bound.kind
-   of boundError:
-      result = lowerBoundError(bound)
+   of boundError, boundLiteral, boundIdentifier, boundLabel, boundGoto:
+      return bound
    of boundRoot:
-      result = lowerBoundRoot(bound)
-   of boundLiteral:
-      result = lowerBoundLiteral(bound)
-   of boundIdentifier:
-      result = lowerBoundIdentifier(bound)
+      result = lowerRoot(bound)
    of boundUnaryOperator:
-      result = lowerBoundUnaryOperator(bound)
+      result = lowerUnaryOperator(bound)
    of boundBinaryOperator:
-      result = lowerBoundBinaryOperator(bound)
+      result = lowerBinaryOperator(bound)
    of boundAssignment:
-      result = lowerBoundAssignment(bound)
+      result = lowerAssignment(bound)
    of boundDefinition:
-      result = lowerBoundDefinition(bound)
+      result = lowerDefinition(bound)
    of boundFunctionCall:
-      result = lowerBoundFunctionCall(bound)
+      result = lowerFunctionCall(bound)
    of boundConditional:
-      result = lowerBoundConditional(bound)
+      result = lowerConditional(bound)
    of boundWhileLoop:
-      result = lowerBoundWhileLoop(bound)
+      result = lowerWhileLoop(bound)
    of boundReturn:
-      result = lowerBoundReturn(bound)
+      result = lowerReturn(bound)
    of boundBlock:
-      result = lowerBoundBlock(bound)
+      result = lowerBlock(bound)
+   of boundConditionalGoto:
+      result = lowerConditionalGoto(bound)
 
    if result != bound:
+      result.binder = bound.binder
       result.scope = bound.scope
       result.dtype = bound.dtype
