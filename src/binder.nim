@@ -1,4 +1,4 @@
-import strutils, tables
+import strutils, tables, hashes
 import parser, lexer, binder_ops, identifiers, diagnostics
 export binder_ops
 
@@ -26,6 +26,9 @@ type
       context*: Bound
       identifiers*: OrderedTable[string, Identifier]
       labelCount*: int
+
+   BoundLabel* = ref object
+      name*: string
 
    Bound* = ref object
       scope*: BoundScope
@@ -72,16 +75,22 @@ type
       of boundBlock:
          blockExpressions*: seq[Bound]
       of boundLabel, boundGoto:
-         label*: string
+         label*: BoundLabel
       of boundConditionalGoto:
          gotoCondition*: Bound
-         gotoLabel*: string
+         gotoLabel*: BoundLabel
+         gotoIfTrue*: bool
 
    Binder* = ref object
       root*: Bound
       diagnostics*: Diagnostics
       scope*: BoundScope
       baseTypes: Table[DtypeBase, Dtype]
+      nextLabel*: int
+
+func `$`*(self: BoundLabel): string = return self.name
+
+func hash*(self: BoundLabel): Hash = return cast[pointer](self).hash
 
 func getScope*(self: Bound): Bound =
    if self == nil: raise (ref Exception)(msg: "bound is nil!")

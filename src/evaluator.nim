@@ -70,30 +70,33 @@ func evaluateBinaryOperator(self: var Evaluator, node: Bound): Value =
 func evaluateBlock*(self: var Evaluator, node: Bound): Value =
    assert node.kind == boundBlock
    var scope = Evaluator(parent: self)
-   var labelToIndex = newTable[string, int]()
+   var labelToIndex = newTable[BoundLabel, int]()
    for index, expression in node.blockExpressions:
       if expression.kind == boundLabel:
          labelToIndex[expression.label] = index
 
+   var lastValue = Value(dtype: newDtype(tvoid))
    var index = 0
    while index < node.blockExpressions.len:
       var expression = node.blockExpressions[index]
       case expression.kind
       of boundGoto:
-         index = labelToIndex[node.label]
+         index = labelToIndex[expression.label]
       of boundConditionalGoto:
-         let condition = scope.evaluate(expression)
-         if condition.valBool:
+         let condition = scope.evaluate(expression.gotoCondition)
+         if condition.valBool == expression.gotoIfTrue:
             index = labelToIndex[expression.gotoLabel]
       of boundLabel:
          discard
       of boundReturn:
-         if expression.returnExpr.isNil: return Value(dtype: newDtype(tvoid))
+         if expression.returnExpr.isNil: return lastValue
          else: return self.evaluate(expression.returnExpr)
       else:
-         discard self.evaluate(expression)
+         if node.dtype.base != tvoid:
+            lastValue = self.evaluate(expression)
+         else: discard self.evaluate(expression)
       index.inc()
-   return Value(dtype: newDtype(tvoid))
+   return lastValue
 
 func evaluate*(self: var Evaluator, node: Bound): Value =
    case node.kind

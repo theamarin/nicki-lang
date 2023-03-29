@@ -35,6 +35,8 @@ for kind, key, val in p.getopt():
          echo "Error: Unknown option " & escape(key)
          quit(QuitFailure)
    of cmdEnd: assert(false) # cannot happen
+
+
 if filename != "":
    let f = open(filename, fmRead)
    let data = f.readAll()

@@ -1,5 +1,17 @@
 import binder
 
+func generateLabel(bound: Bound, suffix = ""): BoundLabel =
+   result = BoundLabel(name: "label_" & $bound.binder.nextLabel)
+   if suffix.len > 0: result.name &= "_" & suffix
+   bound.binder.nextLabel.inc()
+
+func inherit(self: Bound, inheriter: Bound) =
+   self.scope = inheriter.scope
+   self.parent = inheriter.parent
+   self.binder = inheriter.binder
+   self.dtype = inheriter.dtype
+
+
 func lower*(bound: Bound): Bound
 
 func lowerRoot(bound: Bound): Bound =
@@ -8,73 +20,115 @@ func lowerRoot(bound: Bound): Bound =
 func lowerUnaryOperator(bound: Bound): Bound =
    let operand = bound.unaryOperand.lower()
    if operand == bound.unaryOperand: return bound
-   return Bound(kind: boundUnaryOperator, unaryOperator: bound.unaryOperator, unaryOperand: operand)
+   result = Bound(kind: boundUnaryOperator, unaryOperator: bound.unaryOperator,
+         unaryOperand: operand)
+   result.inherit(bound)
 
 func lowerBinaryOperator(bound: Bound): Bound =
    let left = bound.binaryLeft.lower()
    let right = bound.binaryRight.lower()
    if left == bound.binaryLeft and right == bound.binaryRight: return bound
-   return Bound(kind: boundBinaryOperator, binaryLeft: left, binaryOperator: bound.binaryOperator,
+   result = Bound(kind: boundBinaryOperator, binaryLeft: left, binaryOperator: bound.binaryOperator,
          binaryRight: right)
+   result.inherit(bound)
 
 func lowerAssignment(bound: Bound): Bound =
    let rvalue = bound.rvalue.lower()
    if rvalue == bound.rvalue: return bound
-   return Bound(kind: boundAssignment, lvalue: bound.lvalue, rvalue: rvalue)
+   result = Bound(kind: boundAssignment, lvalue: bound.lvalue, rvalue: rvalue)
+   result.inherit(bound)
 
 func lowerDefinition(bound: Bound): Bound =
    let initialization = bound.defInitialization.lower()
    if initialization == bound.defInitialization: return bound
-   return Bound(kind: boundDefinition, defIdentifier: bound.defIdentifier, defDtype: bound.defDtype,
-         defInitialization: initialization)
+   result = Bound(kind: boundDefinition, defIdentifier: bound.defIdentifier,
+         defDtype: bound.defDtype, defInitialization: initialization)
+   result.inherit(bound)
 
 func lowerFunctionCall(bound: Bound): Bound =
-   var newArguments = newSeq[Bound](bound.callArguments.len())
+   var newArguments = newSeq[Bound]()
    var dirty = false
    for arg in bound.callArguments:
       let newArg = arg.lower()
       if newArg != arg: dirty = true
       newArguments.add(newArg)
    if not dirty: return bound
-   return Bound(kind: boundFunctionCall, callIdentifier: bound.callIdentifier,
+   result = Bound(kind: boundFunctionCall, callIdentifier: bound.callIdentifier,
          callArguments: newArguments)
+   result.inherit(bound)
 
 func lowerConditional(bound: Bound): Bound =
-   let condition = bound.condition.lower()
-   let conditional = bound.conditional.lower()
-   let otherwise = bound.otherwise.lower()
-   if condition == bound.condition and conditional == bound.conditional and
-         otherwise == bound.otherwise: return bound
-   return Bound(kind: boundConditional, conditionToken: bound.conditionToken, condition: condition,
-         conditional: conditional, otherwise: otherwise)
+   # if <condition>
+   #      <then>
+   # else
+   #      <else>
+   #
+   # ---->
+   #
+   # gotoFalse <condition> else
+   # <then>
+   # goto end
+   # else:
+   # <else>
+   # end:
+
+   result = Bound(kind: boundBlock)
+   result.inherit(bound)
+   if not bound.condition.isNil:
+      let elseLabel = bound.generateLabel("else")
+      let endLabel = bound.generateLabel("endif")
+
+      result.blockExpressions.add(Bound(kind: boundConditionalGoto, gotoLabel: elseLabel,
+            gotoCondition: bound.condition, gotoIfTrue: false))
+      result.blockExpressions.add(bound.conditional)
+      result.blockExpressions.add(Bound(kind: boundGoto, label: endLabel))
+      result.blockExpressions.add(Bound(kind: boundLabel, label: elseLabel))
+      if not bound.otherwise.isNil:
+         result.blockExpressions.add(bound.otherwise)
+      result.blockExpressions.add(Bound(kind: boundLabel, label: endLabel))
+   else:
+      assert not bound.conditional.isNil
+      result.blockExpressions.add(bound.conditional)
+
+   for expression in result.blockExpressions:
+      expression.inherit(bound)
+   return result.lower()
+
+
 
 func lowerWhileLoop(bound: Bound): Bound =
    let condition = bound.whileCondition.lower()
    let body = bound.whileBody.lower()
    if condition == bound.whileCondition and body == bound.whileBody: return bound
-   return Bound(kind: boundWhileLoop, whileCondition: condition, whileBody: body)
+   result = Bound(kind: boundWhileLoop, whileCondition: condition, whileBody: body)
+   result.inherit(bound)
 
 func lowerReturn(bound: Bound): Bound =
    let returnExpr = bound.returnExpr.lower()
    if returnExpr == bound.returnExpr: return bound
-   return Bound(kind: boundReturn, returnExpr: returnExpr)
+   result = Bound(kind: boundReturn, returnExpr: returnExpr)
+   result.inherit(bound)
 
 func flattenBlock(bound: Bound): Bound =
+   assert not bound.isNil
    var newExpressions: seq[Bound]
    var stack: seq[Bound]
    stack.add(bound)
    while stack.len > 0:
       var current = stack.pop()
+      assert not current.isNil
       let currentLen = stack.len()
       if current.kind == boundBlock:
          for s in current.blockExpressions:
+            assert not s.isNil
             stack.insert(s, currentLen)
       else:
          newExpressions.add(current)
    result = Bound(kind: boundBlock, blockExpressions: newExpressions)
+   result.inherit(bound)
 
 func lowerBlock(bound: Bound): Bound =
-   var newExpressions = newSeq[Bound](bound.blockExpressions.len())
+   var newExpressions = newSeq[Bound]()
    var dirty = false
    for expression in bound.blockExpressions:
       let newExpression = expression.lower()
@@ -82,12 +136,14 @@ func lowerBlock(bound: Bound): Bound =
       newExpressions.add(newExpression)
    if not dirty: return bound
    result = Bound(kind: boundBlock, blockExpressions: newExpressions)
+   result.inherit(bound)
    return flattenBlock(result)
 
 func lowerConditionalGoto(bound: Bound): Bound =
    let condition = bound.gotoCondition.lower()
-   if condition == bound.condition: return bound
-   return Bound(kind: boundConditionalGoto, gotoCondition: condition)
+   if condition == bound.gotoCondition: return bound
+   result = Bound(kind: boundConditionalGoto, gotoCondition: condition)
+   result.inherit(bound)
 
 func lower*(bound: Bound): Bound =
    if bound.isNil: return nil
@@ -116,8 +172,3 @@ func lower*(bound: Bound): Bound =
       result = lowerBlock(bound)
    of boundConditionalGoto:
       result = lowerConditionalGoto(bound)
-
-   if result != bound:
-      result.binder = bound.binder
-      result.scope = bound.scope
-      result.dtype = bound.dtype
