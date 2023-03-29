@@ -59,18 +59,18 @@ func lowerFunctionCall(bound: Bound): Bound =
 
 func lowerConditional(bound: Bound): Bound =
    # if <condition>
-   #      <then>
+   #      <conditional>
    # else
-   #      <else>
+   #      <otherwise>
    #
    # ---->
    #
-   # gotoFalse <condition> else
-   # <then>
-   # goto end
+   # gotoIfFalse <condition> else
+   # <conditional>
+   # goto endif
    # else:
-   # <else>
-   # end:
+   # <otherwise>
+   # endif:
 
    result = Bound(kind: boundBlock)
    result.inherit(bound)
@@ -90,18 +90,35 @@ func lowerConditional(bound: Bound): Bound =
       assert not bound.conditional.isNil
       result.blockExpressions.add(bound.conditional)
 
-   for expression in result.blockExpressions:
-      expression.inherit(bound)
+   for expression in result.blockExpressions: expression.inherit(bound)
    return result.lower()
 
 
-
 func lowerWhileLoop(bound: Bound): Bound =
-   let condition = bound.whileCondition.lower()
-   let body = bound.whileBody.lower()
-   if condition == bound.whileCondition and body == bound.whileBody: return bound
-   result = Bound(kind: boundWhileLoop, whileCondition: condition, whileBody: body)
+   # while <condition>
+   #      <body>
+   #
+   # ----->
+   #
+   # continue:
+   # gotoIfNot <condition> break
+   # <body>
+   # goto continue
+   # break:
+   result = Bound(kind: boundBlock)
    result.inherit(bound)
+
+   let continueLabel = bound.generateLabel("continue")
+   let breakLabel = bound.generateLabel("break")
+
+   result.blockExpressions.add(Bound(kind: boundLabel, label: continueLabel))
+   result.blockExpressions.add(Bound(kind: boundConditionalGoto, gotoLabel: breakLabel,
+      gotoCondition: bound.whileCondition, gotoIfTrue: false))
+   result.blockExpressions.add(bound.whileBody)
+   result.blockExpressions.add(Bound(kind: boundGoto, label: continueLabel))
+   result.blockExpressions.add(Bound(kind: boundLabel, label: breakLabel))
+   for expression in result.blockExpressions: expression.inherit(bound)
+   return result.lower()
 
 func lowerReturn(bound: Bound): Bound =
    let returnExpr = bound.returnExpr.lower()

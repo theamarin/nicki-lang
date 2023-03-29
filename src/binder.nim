@@ -23,9 +23,9 @@ type
       boundConditionalGoto = "conditional goto"
 
    BoundScope* = ref object
-      context*: Bound
+      functionContext*: Bound
+      loopContext*: Bound
       identifiers*: OrderedTable[string, Identifier]
-      labelCount*: int
 
    BoundLabel* = ref object
       name*: string
@@ -100,12 +100,21 @@ func getScope*(self: Bound): Bound =
       bound = bound.parent
    raise (ref Exception)(msg: "No root bound exists!")
 
-func getContext*(self: Bound): Bound =
+func getFunctionContext*(self: Bound): Bound =
    if self == nil: raise (ref Exception)(msg: "bound is nil!")
    var bound = self
    while bound != nil:
-      if bound.scope != nil and bound.scope.context != nil:
-         return bound.scope.context
+      if bound.scope != nil and bound.scope.functionContext != nil:
+         return bound.scope.functionContext
+      bound = bound.parent
+   return nil
+
+func getLoopContext*(self: Bound): Bound =
+   if self == nil: raise (ref Exception)(msg: "bound is nil!")
+   var bound = self
+   while bound != nil:
+      if bound.scope != nil and bound.scope.loopContext != nil:
+         return bound.scope.loopContext
       bound = bound.parent
    return nil
 
@@ -282,7 +291,7 @@ func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
    result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
    result.dtype = newDtype(tvoid)
    result.defDtype = newDtype(tfunc)
-   result.scope = BoundScope(context: result)
+   result.scope = BoundScope(functionContext: result)
    for parameter in node.defParameters:
       let p = result.bindParameter(parameter)
       result.defDtype.parameters.add(p)
@@ -373,14 +382,15 @@ func bindWhileExpression(parent: Bound, node: Node): Bound =
    assert node.kind == whileExpression
    result = Bound(kind: boundWhileLoop, parent: parent, binder: parent.binder)
    result.whileCondition = result.bindExpression(node.whileCondition)
+   result.scope = BoundScope(loopContext: result)
    result.whileBody = result.bindExpression(node.whileBody)
    result.dtype = newDtype(tvoid)
 
 func bindReturnExpression(parent: Bound, node: Node): Bound =
    assert node.kind == returnExpression
    result = Bound(kind: boundReturn, parent: parent, binder: parent.binder)
-   let context = parent.getContext()
-   if context.isNil:
+   let functionContext = parent.getFunctionContext()
+   if functionContext.isNil:
       parent.binder.diagnostics.reportReturnOutsideFunction(node.returnToken.pos)
       result.dtype = newDtype(terror)
       return
@@ -389,9 +399,9 @@ func bindReturnExpression(parent: Bound, node: Node): Bound =
       result.dtype = newDtype(result.returnExpr.dtype)
    else:
       result.dtype = newDtype(tvoid)
-   if result.dtype != context.defDtype.retDtype:
+   if result.dtype != functionContext.defDtype.retDtype:
       result.binder.diagnostics.reportCannotCast(node.returnExpr.pos, $result.dtype,
-            $context.defDtype.retDtype)
+            $functionContext.defDtype.retDtype)
 
 func bindBlockExpression(parent: Bound, node: Node): Bound =
    assert node.kind == blockExpression
