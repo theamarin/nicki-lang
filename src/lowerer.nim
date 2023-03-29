@@ -95,7 +95,7 @@ func lowerConditional(bound: Bound): Bound =
 
 
 func lowerWhileLoop(bound: Bound): Bound =
-   # while <condition>
+   # while <condition>:
    #      <body>
    #
    # ----->

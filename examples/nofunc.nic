@@ -1,0 +1,7 @@
+{
+   def y: int
+   while y < 10:
+   {
+      y = y + 1
+   }
+}

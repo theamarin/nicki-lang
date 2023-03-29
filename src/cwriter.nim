@@ -4,7 +4,7 @@ import identifiers, lexer, evaluator_ops, binder
 func toC*(self: ValueBase): string =
    case self.dtypeBase
    of tbool:
-      if self.valBool: return "1" else:  return "0"
+      if self.valBool: return "1" else: return "0"
    of tint: return $self.valInt
    of tstr: return escape(self.valStr)
    else: raiseUnexpectedDtypeException($self.dtypeBase, "conversion to C")
@@ -45,11 +45,15 @@ func compile*(bound: Bound): seq[string] =
       of boundBinaryLogicalXor: result.add("^")
       result.add(bound.binaryRight.compile().join(" "))
    of boundAssignment:
-      result.add(bound.lvalue.text)
+      result.add(bound.lvalue.name)
       result.add("=")
       result.add(bound.rvalue.compile)
    of boundDefinition:
-      raise (ref ValueError)(msg: "Not yet implemented: definition")
+      result.add($bound.defDtype.base)
+      result.add($bound.defIdentifier.name)
+      if not bound.defInitialization.isNil:
+         result.add(bound.defInitialization.compile())
+      else: result.add(" = {0}")
    of boundFunctionCall:
       raise (ref ValueError)(msg: "Not yet implemented: function call")
    of boundConditional:
@@ -61,15 +65,28 @@ func compile*(bound: Bound): seq[string] =
       if bound.otherwise != nil:
          result.add("else")
          result.add(bound.otherwise.compile())
-   of boundWhileLoop:
-      raise (ref ValueError)(msg: "Not yet implemented: while loop")
    of boundBlock:
       result.add("{")
       var last = false
       for idx, expression in bound.blockExpressions:
          if idx == bound.blockExpressions.len()-1: last = true
-         var exp: string
-         if last: exp = "return "
-         exp &= expression.compile.join(" ") & ";"
+         var exp = expression.compile.join(" ") & ";"
          result.add(exp)
       result.add("}")
+   of boundLabel:
+      result.add(bound.label.name & ":")
+   of boundGoto:
+      result.add("goto " & bound.label.name)
+   of boundConditionalGoto:
+      result.add("if(")
+      result.add(bound.gotoCondition.compile())
+      result.add(")")
+      result.add("goto " & bound.gotoLabel.name)
+   of boundReturn:
+      if bound.returnExpr.isNil: result.add("return")
+      else:
+         result.add("return (")
+         result.add(bound.returnExpr.compile())
+         result.add(")")
+   of boundWhileLoop:
+      raise (ref ValueError)(msg: "Not implemented: " & $bound.kind)
