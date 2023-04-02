@@ -43,7 +43,7 @@ if filename != "":
    f.close()
    let lines = data.splitLines()
    var parser = data.parse()
-   if showTree: echo $parser.root
+   if showTree: echo parser.root.asTree
    if parser.diagnostics.len > 0:
       for report in parser.diagnostics:
          writeLine(stdout, lines[report.pos.line])
@@ -51,7 +51,7 @@ if filename != "":
                filename & ":" & $report.pos)
       quit(QuitFailure)
    let bound = myBinder.bindExpression(parser.root)
-   if showBind: echo $bound
+   if showBind: echo bound.asTree
    if myBinder.diagnostics.len > 0:
       for report in myBinder.diagnostics:
          writeLine(stdout, lines[report.pos.line])
@@ -59,7 +59,7 @@ if filename != "":
                filename & ":" & $report.pos)
       quit(QuitFailure)
    let lowered = bound.lower()
-   if showBind: echo $lowered
+   if showBind: echo lowered.asTree
    let result = myEvaluator.evaluate(lowered)
    if result.dtype.base != tvoid: writeline(stdout, $result)
 
@@ -89,7 +89,7 @@ while true:
    of "#showBind": showBind = not showBind; echo("showBind: " & $showBind); continue
    of "#showVars": showVars = not showVars; echo("showVars: " & $showVars); continue
    var parser = line.parse()
-   if showTree: echo $parser.root
+   if showTree: echo parser.root.asTree
    if parser.diagnostics.len > 0:
       for report in parser.diagnostics:
          writeLine(stdout, " ".repeat(report.pos.column+prompt.len) & "^  " & report.msg)
@@ -98,7 +98,7 @@ while true:
 
    let identifiersBackup = myBinder.root.scope.identifiers
    let bound = myBinder.bindExpression(parser.root)
-   if showBind: echo $bound
+   if showBind: echo bound.asTree
    if myBinder.diagnostics.len > 0:
       for report in myBinder.diagnostics:
          writeLine(stdout, " ".repeat(report.pos.column+prompt.len) & "^  " & report.msg)
@@ -106,7 +106,7 @@ while true:
       myBinder.root.scope.identifiers = identifiersBackup # Reset scope on error
       continue
    let lowered = bound.lower()
-   if showBind: echo $lowered
+   if showBind: echo lowered.asTree
 
    let result = myEvaluator.evaluate(lowered)
    if result.dtype.base != tvoid: writeline(stdout, $result)

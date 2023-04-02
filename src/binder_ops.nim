@@ -101,3 +101,30 @@ func getBinaryOperator*(diagnostics: var Diagnostics, leftDtype: Dtype, token: T
    elif terror in [leftDtype.base, rightDtype.base]: discard
    else:
       diagnostics.reportUndefinedBinaryOperator(token.pos, $token.kind, $leftDtype, $rightDtype)
+
+
+func asTree*(x: BoundUnaryOperatorKind): string = $x
+func asTree*(x: BoundBinaryOperatorKind): string = $x
+
+func asCode*(x: BoundUnaryOperatorKind): string =
+   case x
+   of boundUnaryPlus: return "+"
+   of boundUnaryMinus: return "-"
+   of boundUnaryNot: return "not"
+
+func asCode*(x: BoundBinaryOperatorKind): string =
+   case x
+   of boundBinaryAddition: return "+"
+   of boundBinarySubtraction: return "-"
+   of boundBinaryMultiplication: return "*"
+   of boundBinaryDivision: return "/"
+   of boundBinaryEquals: return "=="
+   of boundBinaryNotEquals: return "!="
+   of boundBinaryGreaterThan: return ">"
+   of boundBinaryGreaterEquals: return ">="
+   of boundBinaryLessThan: return "<"
+   of boundBinaryLessEquals: return "<="
+   of boundBinaryCombinedComparison: return "<=>"
+   of boundBinaryLogicalAnd: return "and"
+   of boundBinaryLogicalOr: return "or"
+   of boundBinaryLogicalXor: return "xor"

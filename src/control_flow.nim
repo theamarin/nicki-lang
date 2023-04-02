@@ -89,9 +89,11 @@ func createGraph*(bound: Bound): ControlFlowGraph =
 
 func toStr(b: Block, i: int = -1): string =
    var strs: seq[string]
-   if i >= 0: strs.add("block " & $i)
+   # if i >= 0: strs.add("block " & $i)
+   if i == 0: strs.add("<start>")
+   elif b.bounds.len == 0: strs.add("<end>")
    for bound in b.bounds:
-      strs.add($bound.kind)
+      strs.add(bound.asCode)
    return strs.join("\\n")
 
 proc writeTo*(blocks: ControlFlowGraph, filename: string) =
@@ -106,12 +108,12 @@ proc writeTo*(blocks: ControlFlowGraph, filename: string) =
          edges.add(edge)
    for i, b in blocks:
       var id = blockIds[b];
-      var label = "\"" & b.toStr(i) & "\""
+      var label = "" & escape(b.toStr(i)).replace("\\\\n", "\\n")
       f.writeLine(&"    {id} [label = {label}, shape = box]");
    for edge in edges:
       let fromId = blockIds[edge.`from`]
       let toId = blockIds[edge.`to`]
-      let label = if edge.condition.isNil: "" else: $edge.condition.kind
+      let label = if edge.condition.isNil: "" else: $edge.condition.asCode
       f.writeLine(&"    {fromId} -> {toId} [label = {label.escape}]");
    f.writeLine("}");
    f.close()

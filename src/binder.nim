@@ -49,11 +49,12 @@ type
          unaryOperator*: BoundUnaryOperatorKind
          unaryOperand*: Bound
       of boundBinaryOperator:
-         binaryOperator*: BoundBinaryOperatorKind
          binaryLeft*: Bound
+         binaryOperator*: BoundBinaryOperatorKind
          binaryRight*: Bound
       of boundAssignment:
          lvalue*: Identifier
+         assignmentToken*: Token
          rvalue*: Bound
       of boundDefinition:
          defIdentifier*: Identifier
@@ -89,6 +90,11 @@ type
       nextLabel*: int
 
 func `$`*(self: BoundLabel): string = return self.name
+func asTree*(self: BoundLabel): string = return self.name
+func asCode*(self: BoundLabel): string = return self.name
+
+func asTree*(x: bool): string = $x
+func asCode*(x: bool): string = $x
 
 func hash*(self: BoundLabel): Hash = return cast[pointer](self).hash
 
@@ -175,7 +181,53 @@ func pos*(node: Bound): Position =
       else: discard
    raise (ref Exception)(msg: "No position for bound " & escape($node.kind))
 
-func `$`*(bound: Bound): string =
+func asCode*(bound: Bound): string =
+   if bound.isNil: return ""
+   case bound.kind
+   of boundError:
+      return "error"
+   of boundRoot:
+      return bound.main.asCode
+   of boundLiteral:
+      return bound.value.asCode
+   of boundIdentifier:
+      return bound.identifier.asCode
+   of boundUnaryOperator:
+      return bound.unaryOperator.asCode & " " & bound.unaryOperand.asCode
+   of boundBinaryOperator:
+      return bound.binaryLeft.asCode & bound.binaryOperator.asCode & bound.binaryRight.asCode
+   of boundAssignment:
+      return bound.lvalue.asCode & bound.assignmentToken.asCode & bound.rvalue.asCode
+   of boundDefinition:
+      result = bound.defIdentifier.asCode & ": " & bound.defDtype.asCode
+      if not bound.defInitialization.isNil: result &= " = " & bound.defInitialization.asCode
+   of boundFunctionCall:
+      var args: seq[string]
+      for arg in bound.callArguments: args.add(arg.asCode)
+      return bound.callIdentifier.asCode & "(" & args.join(", ") & ")"
+   of boundConditional:
+      result = bound.conditionToken.asCode
+      if not bound.condition.isNil: result &= bound.condition.asCode
+      result &= ": " & bound.conditional.asCode
+      if not bound.otherwise.isNil: result &= bound.otherwise.asCode
+   of boundWhileLoop:
+      return "while " & bound.whileCondition.asCode & ": " & bound.whileBody.asCode
+   of boundReturn:
+      return "return " & bound.returnExpr.asCode
+   of boundBlock:
+      var exprs: seq[string]
+      for expression in bound.blockExpressions: exprs.add(expression.asCode)
+      return "{" & exprs.join("\p") & "}"
+   of boundLabel:
+      return bound.label.asCode & ":"
+   of boundGoto:
+      return "goto " & bound.label.asCode
+   of boundConditionalGoto:
+      return "if " & bound.gotoCondition.asCode & " == " & bound.gotoIfTrue.asCode & ": " &
+            bound.gotoLabel.asCode
+
+
+func asTree*(bound: Bound): string =
    if bound.isNil: return ""
    let intro = $bound.kind & ": "
    var children: seq[string]
@@ -184,9 +236,9 @@ func `$`*(bound: Bound): string =
       elif value is seq:
          children.add(key)
          for x in value:
-            children.add(indent($x, 3))
+            children.add(indent(x.asTree, 3))
       else:
-         children.add(prettyPrint(key, $value))
+         children.add(prettyPrint(key, value.asTree))
    return intro & "\p" & children.join("\p").indent(3)
 
 func toDtype*(bound: Bound, dtypeToken: Token): Dtype =
@@ -258,11 +310,12 @@ func bindAssignmentExpression(parent: Bound, node: Node): Bound =
    assert node.lvalue.kind == tokenIdentifier
    result = Bound(kind: boundAssignment, parent: parent, binder: parent.binder)
    result.lvalue = result.tryLookup(node.lvalue.text)
+   result.assignmentToken = node.assignmentToken
    result.rvalue = result.bindExpression(node.rvalue)
    if result.lvalue == nil:
       result.binder.diagnostics.reportUndefinedIdentifier(node.lvalue.pos, node.lvalue.text)
    elif result.lvalue.dtype != result.rvalue.dtype:
-      result.binder.diagnostics.reportCannotCast(node.assignment.pos, $result.rvalue.dtype,
+      result.binder.diagnostics.reportCannotCast(node.assignmentToken.pos, $result.rvalue.dtype,
             $result.lvalue.dtype)
    result.dtype = result.rvalue.dtype
 

@@ -91,6 +91,13 @@ func `$`*(val: ValueBase): string =
    of tstr: return $val.valStr
    else: return "[" & $val.dtypeBase & "]"
 
+func asCode*(val: ValueBase): string =
+   case val.dtypeBase
+   of tbool: return $val.valBool
+   of tint: return $val.valInt
+   of tstr: return escape(val.valStr)
+   else: return "[" & $val.dtypeBase & "]"
+
 func `$`*(token: Token): string =
    if token.isNil: return ""
    result &= token.text

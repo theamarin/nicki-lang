@@ -54,7 +54,8 @@ type
          defAssignToken*: Token
          defAssignExpression*: Node
       of assignmentExpression:
-         lvalue*, assignment*: Token
+         lvalue*: Token
+         assignmentToken*: Token
          rvalue*: Node
       of callArgumentExpression:
          callArgSeparator*: Token
@@ -102,7 +103,10 @@ func pos*(node: Node): Position =
       else: return value.pos
    return Position()
 
-func `$`*(node: Node): string =
+func asTree*(token: Token): string = $token
+func asTree*(val: ValueBase): string = $val
+
+func asTree*(node: Node): string =
    if node.isNil: return ""
    let intro = $node.kind & ": "
    var children: seq[string]
@@ -111,10 +115,23 @@ func `$`*(node: Node): string =
       elif value is seq:
          children.add(key)
          for x in value:
-            children.add(indent($x, 3))
+            children.add(indent(x.asTree, 3))
       else:
-         children.add(prettyPrint(key, $value))
+         children.add(prettyPrint(key, value.asTree))
    return intro & "\p" & children.join("\p").indent(3)
+
+func asCode*(token: Token): string = $token
+func asCode*(node: Node): string =
+   if node.isNil: return ""
+   var children: seq[string]
+   for key, value in fieldPairs(node[]):
+      when key == "kind": discard
+      elif value is seq:
+         for x in value:
+            children.add(x.asCode)
+      else:
+         children.add(value.asCode)
+   return children.join(" ")
 
 func peek(parser: Parser, offset: int = 1): Token =
    return parser.lexer.get(parser.pos + offset)
@@ -215,10 +232,10 @@ func parseDefinitionExpression(parser: var Parser): Node =
 func parseAssignmentExpression(parser: var Parser): Node =
    if parser.current.kind == tokenIdentifier and parser.peek.kind == tokenEquals:
       let lvalue = parser.nextToken
-      let assignment = parser.nextToken()
+      let assignmentToken = parser.nextToken()
       let rvalue = parser.parseAssignmentExpression()
       return Node(kind: assignmentExpression, lvalue: lvalue,
-            assignment: assignment, rvalue: rvalue)
+            assignmentToken: assignmentToken, rvalue: rvalue)
    return parser.parseOperatorExpression()
 
 func parseCallArgumentExpression(parser: var Parser, isFirst: bool): Node =

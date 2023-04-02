@@ -144,9 +144,10 @@ func lowerBlock(bound: Bound): Bound =
       let newExpression = expression.lower()
       if newExpression != expression: dirty = true
       newExpressions.add(newExpression)
-   if not dirty: return bound
-   result = Bound(kind: boundBlock, blockExpressions: newExpressions)
-   result.inherit(bound)
+   if dirty:
+      result = Bound(kind: boundBlock, blockExpressions: newExpressions)
+      result.inherit(bound)
+   else: result = bound
    return flattenBlock(result)
 
 func lowerConditionalGoto(bound: Bound): Bound =

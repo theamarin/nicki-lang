@@ -62,9 +62,12 @@ func `$`*(dtype: Dtype): string =
             if idx > 0: result &= ", "
             result &= p.name & ": " & $p.dtype
          result &= "): " & $dtype.retDtype
-         if dtype.hasImplementation: result &= " = [implementation]"
+         # if dtype.hasImplementation: result &= " = [implementation]"
    of tstruct: discard
    of tenum: discard
+
+func asTree*(dtype: Dtype): string = $dtype
+func asCode*(dtype: Dtype): string = $dtype
 
 func newDtype*(base: DtypeBase, pos: Position = Position()): Dtype =
    return Dtype(pos: pos, base: base)
@@ -88,3 +91,6 @@ func newDtype*(dtype: Dtype, pos: Position = Position()): Dtype =
 
 func `$`*(id: Identifier): string =
    return id.name & ": " & $id.dtype
+
+func asTree*(id: Identifier): string = $id
+func asCode*(id: Identifier): string = id.name
