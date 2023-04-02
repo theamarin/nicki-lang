@@ -92,6 +92,12 @@ func `$`*(self: BoundLabel): string = return self.name
 
 func hash*(self: BoundLabel): Hash = return cast[pointer](self).hash
 
+func inherit*(self: Bound, inheriter: Bound) =
+   self.scope = inheriter.scope
+   self.parent = inheriter.parent
+   self.binder = inheriter.binder
+   self.dtype = inheriter.dtype
+
 func getScope*(self: Bound): Bound =
    if self == nil: raise (ref Exception)(msg: "bound is nil!")
    var bound = self

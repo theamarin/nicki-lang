@@ -5,13 +5,6 @@ func generateLabel(bound: Bound, suffix = ""): BoundLabel =
    if suffix.len > 0: result.name &= "_" & suffix
    bound.binder.nextLabel.inc()
 
-func inherit(self: Bound, inheriter: Bound) =
-   self.scope = inheriter.scope
-   self.parent = inheriter.parent
-   self.binder = inheriter.binder
-   self.dtype = inheriter.dtype
-
-
 func lower*(bound: Bound): Bound
 
 func lowerRoot(bound: Bound): Bound =

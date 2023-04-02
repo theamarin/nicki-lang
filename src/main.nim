@@ -1,5 +1,5 @@
 import strutils, tables, parseopt, os
-import parser, binder, evaluator, diagnostics, identifiers, lowerer
+import parser, binder, evaluator, diagnostics, identifiers, lowerer, control_flow
 
 var showTree = false
 var showBind = false
@@ -62,6 +62,9 @@ if filename != "":
    if showBind: echo $lowered
    let result = myEvaluator.evaluate(lowered)
    if result.dtype.base != tvoid: writeline(stdout, $result)
+
+   let graph = lowered.createGraph()
+   graph.writeTo("myGraph.dot")
    quit(QuitSuccess)
 
 
