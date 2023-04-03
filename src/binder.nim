@@ -175,9 +175,10 @@ func addBaseDtypes*(self: Bound) =
 
 func pos*(node: Bound): Position =
    for key, value in fieldPairs(node[]):
-      when key == "kind": discard
+      when key in ["kind", "scope", "parent", "binder"]: discard
       elif value is seq: return value[0].pos
-      elif value is Token or value is Node or value is Bound: return value.pos
+      elif value is Token or value is Node or value is Bound:
+         if not value.isNil: return value.pos
       else: discard
    raise (ref Exception)(msg: "No position for bound " & escape($node.kind))
 
@@ -199,7 +200,7 @@ func asCode*(bound: Bound): string =
    of boundAssignment:
       return bound.lvalue.asCode & bound.assignmentToken.asCode & bound.rvalue.asCode
    of boundDefinition:
-      result = bound.defIdentifier.asCode & ": " & bound.defDtype.asCode
+      result = $tokenDef & " " & bound.defIdentifier.asCode & ": " & bound.defDtype.asCode
       if not bound.defInitialization.isNil: result &= " = " & bound.defInitialization.asCode
    of boundFunctionCall:
       var args: seq[string]
@@ -223,7 +224,7 @@ func asCode*(bound: Bound): string =
    of boundGoto:
       return "goto " & bound.label.asCode
    of boundConditionalGoto:
-      return "if " & bound.gotoCondition.asCode & " == " & bound.gotoIfTrue.asCode & ": " &
+      return "if " & bound.gotoCondition.asCode & " == " & bound.gotoIfTrue.asCode & ": goto " &
             bound.gotoLabel.asCode
 
 
@@ -361,10 +362,6 @@ func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
    if node.defAssignExpression != nil:
       result.defInitialization = result.bindBlockExpression(node.defAssignExpression)
       result.defDtype.hasImplementation = true
-      # if result.defInitialization.dtype != result.defDtype.retDtype and
-      #       terror notin [result.defInitialization.dtype.base, result.defDtype.retdtype.base]:
-      #    result.binder.diagnostics.reportCannotCast(node.defAssignToken.pos,
-      #          $result.defInitialization.dtype, $result.defDtype.retDtype)
 
 func bindDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression

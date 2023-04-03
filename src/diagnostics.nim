@@ -105,3 +105,10 @@ func reportInconsistentConditionals*(self: var Diagnostics, pos: Position,
 
 func reportReturnOutsideFunction*(self: var Diagnostics, pos: Position) =
    self.report("Return keyword can only be used in the context of a function", pos)
+
+# Control flow
+func reportNotAllPathsReturnValue*(self: var Diagnostics, pos: Position) =
+   self.report("Not all control paths return a value", pos)
+
+func reportUnreachableCode*(self: var Diagnostics, pos: Position) =
+   self.report("Code is unreachable", pos)

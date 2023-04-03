@@ -59,12 +59,18 @@ if filename != "":
                filename & ":" & $report.pos)
       quit(QuitFailure)
    let lowered = bound.lower()
+
+   lowered.checkControlFlows()
+   if myBinder.diagnostics.len > 0:
+      for report in myBinder.diagnostics:
+         writeLine(stdout, lines[report.pos.line])
+         writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
+               filename & ":" & $report.pos)
+      quit(QuitFailure)
+
    if showBind: echo lowered.asTree
    let result = myEvaluator.evaluate(lowered)
    if result.dtype.base != tvoid: writeline(stdout, $result)
-
-   let graph = lowered.createGraph()
-   graph.writeTo("myGraph.dot")
    quit(QuitSuccess)
 
 

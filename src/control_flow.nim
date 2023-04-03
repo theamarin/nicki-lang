@@ -1,5 +1,5 @@
-import tables, strformat, strutils, hashes
-import binder, lexer, identifiers
+import strutils, strformat, hashes, tables
+import binder, lexer, identifiers, diagnostics
 
 type
    Edge = ref object
@@ -9,13 +9,22 @@ type
    Block = ref object
       bounds: seq[Bound]
       edges: seq[Edge]
+      visited: bool
 
    ControlFlowGraph = seq[Block]
 
 
+# Control flow
+# -------------
+# Cannot split in sparate file because Nim is broken
+
 func hash*(self: Block): Hash = return cast[pointer](self).hash
 
 func connect(`from`, `to`: Block, condition: Bound = nil) =
+   var prunedCondition = condition
+   if not condition.isNil and condition.kind == boundLiteral:
+      if condition.value.valBool == true: prunedCondition = nil
+      else: return
    let edge = Edge(`from`: `from`, to: to, condition: condition)
    `from`.edges.add(edge)
 
@@ -61,7 +70,8 @@ func createEdges(blocks: ControlFlowGraph) =
             labelToBlock[expression.label] = current
 
    for currentIdx, current in blocks:
-      let nextBlock = if currentIdx + 1 < blocks.len: blocks[currentIdx+1] else: endBlock
+      let nextBlock = if currentIdx + 1 < blocks.len: blocks[
+            currentIdx+1] else: endBlock
       for exprIdx, expression in current.bounds:
          case expression.kind
          of boundGoto:
@@ -86,6 +96,40 @@ func createEdges(blocks: ControlFlowGraph) =
 func createGraph*(bound: Bound): ControlFlowGraph =
    result = createBlocks(bound)
    result.createEdges()
+
+func allPathsReturnValue*(blocks: ControlFlowGraph): bool =
+   let endBlock = blocks[^1]
+
+   # Collect edges to endBlock
+   var edges: seq[Edge]
+   for b in blocks:
+      for edge in b.edges:
+         if edge.`to` == endBlock: edges.add(edge)
+
+   for edge in edges:
+      let srcBlock = edge.`from`
+      if srcBlock.bounds.len == 0:
+         return false
+      let lastExpression = srcBlock.bounds[^1]
+      if lastExpression.kind != boundReturn:
+         return false
+   return true
+
+func visitBlocks(b: Block) =
+   if b.visited: return
+   b.visited = true
+   for edge in b.edges: visitBlocks(edge.`to`)
+
+func collectUnreachable*(blocks: ControlFlowGraph): seq[Bound] =
+   let startBlock = blocks[0]
+   visitBlocks(startBlock)
+
+   for b in blocks:
+      if not b.visited:
+         for b in b.bounds:
+            if b.kind != boundLabel:
+               result.add(b)
+               break
 
 func toStr(b: Block, i: int = -1): string =
    var strs: seq[string]
@@ -117,3 +161,27 @@ proc writeTo*(blocks: ControlFlowGraph, filename: string) =
       f.writeLine(&"    {fromId} -> {toId} [label = {label.escape}]");
    f.writeLine("}");
    f.close()
+
+proc checkControlFlow(node: Bound) =
+   let controlFlow = createGraph(node.defInitialization)
+
+   if node.defDtype.retDtype.base != tvoid:
+      if not controlFlow.allPathsReturnValue():
+         node.binder.diagnostics.reportNotAllPathsReturnValue(node.defInitialization.pos)
+
+   let unreachableBounds = controlFlow.collectUnreachable()
+   for unreachable in unreachableBounds:
+      node.binder.diagnostics.reportUnreachableCode(unreachable.pos)
+
+   controlFlow.writeTo("graphs/" & node.defIdentifier.name & ".dot")
+
+proc checkControlFlows*(node: Bound) =
+   case node.kind
+   of boundDefinition:
+      if node.defDtype.base == tfunc:
+         node.checkControlFlow()
+   of boundBlock:
+      for e in node.blockExpressions: e.checkControlFlows()
+   of boundRoot:
+      node.main.checkControlFlows()
+   else: return

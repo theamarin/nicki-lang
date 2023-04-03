@@ -287,7 +287,8 @@ func parsePrimaryExpression(parser: var Parser): Node =
             tokenIdentifier, tokenIf, tokenWhile, tokenBraceOpen}
       parser.diagnostics.reportUnexpectedToken(parser.current.pos, $parser.current.kind,
             $expectedKinds, "primary expression")
-      return Node()
+      # Consume the unexpected token to prevent infinite loops
+      discard parser.nextToken()
 
 func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
    let unaryOperatorPrecedence = getUnaryOperatorPrecedence(parser.current.kind)
