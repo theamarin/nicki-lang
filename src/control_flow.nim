@@ -25,7 +25,7 @@ func connect(`from`, `to`: Block, condition: Bound = nil) =
    if not condition.isNil and condition.kind == boundLiteral:
       if condition.value.valBool == true: prunedCondition = nil
       else: return
-   let edge = Edge(`from`: `from`, to: to, condition: condition)
+   let edge = Edge(`from`: `from`, to: to, condition: prunedCondition)
    `from`.edges.add(edge)
 
 func negate(condition: Bound): Bound =
@@ -103,8 +103,9 @@ func allPathsReturnValue*(blocks: ControlFlowGraph): bool =
    # Collect edges to endBlock
    var edges: seq[Edge]
    for b in blocks:
-      for edge in b.edges:
-         if edge.`to` == endBlock: edges.add(edge)
+      if b.visited:
+         for edge in b.edges:
+            if edge.`to` == endBlock: edges.add(edge)
 
    for edge in edges:
       let srcBlock = edge.`from`
@@ -121,13 +122,10 @@ func visitBlocks(b: Block) =
    for edge in b.edges: visitBlocks(edge.`to`)
 
 func collectUnreachable*(blocks: ControlFlowGraph): seq[Bound] =
-   let startBlock = blocks[0]
-   visitBlocks(startBlock)
-
    for b in blocks:
       if not b.visited:
          for b in b.bounds:
-            if b.kind != boundLabel:
+            if b.kind notin {boundLabel, boundGoto}:
                result.add(b)
                break
 
@@ -164,14 +162,19 @@ proc writeTo*(blocks: ControlFlowGraph, filename: string) =
 
 proc checkControlFlow(node: Bound) =
    let controlFlow = createGraph(node.defInitialization)
+   visitBlocks(controlFlow[0])
+
+   if not controlFlow[^1].visited:
+      node.binder.diagnostics.reportCannotReturn(node.defIdentifier.pos)
 
    if node.defDtype.retDtype.base != tvoid:
       if not controlFlow.allPathsReturnValue():
-         node.binder.diagnostics.reportNotAllPathsReturnValue(node.defInitialization.pos)
+         node.binder.diagnostics.reportNotAllPathsReturnValue(node.defIdentifier.pos)
 
-   let unreachableBounds = controlFlow.collectUnreachable()
-   for unreachable in unreachableBounds:
-      node.binder.diagnostics.reportUnreachableCode(unreachable.pos)
+   if false:
+      let unreachableBounds = controlFlow.collectUnreachable()
+      for unreachable in unreachableBounds:
+         node.binder.diagnostics.reportUnreachableCode(unreachable.pos)
 
    controlFlow.writeTo("graphs/" & node.defIdentifier.name & ".dot")
 

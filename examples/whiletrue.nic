@@ -1,0 +1,14 @@
+{
+   def print(a: int): void = {}
+
+   def loop(): int = {
+      def y: int
+      while true:
+      {
+         print(y)
+         y = y + 1
+         if y > 10:
+            return y
+      }
+   }
+}

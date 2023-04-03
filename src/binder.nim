@@ -456,7 +456,8 @@ func bindReturnExpression(parent: Bound, node: Node): Bound =
    else:
       result.dtype = newDtype(tvoid)
    if result.dtype != functionContext.defDtype.retDtype:
-      result.binder.diagnostics.reportCannotCast(node.returnExpr.pos, $result.dtype,
+      let pos = if not result.returnExpr.isNil: result.returnExpr.pos else: node.returnToken.pos
+      result.binder.diagnostics.reportCannotCast(pos, $result.dtype,
             $functionContext.defDtype.retDtype)
 
 func bindBlockExpression(parent: Bound, node: Node): Bound =

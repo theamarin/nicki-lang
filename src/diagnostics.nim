@@ -112,3 +112,6 @@ func reportNotAllPathsReturnValue*(self: var Diagnostics, pos: Position) =
 
 func reportUnreachableCode*(self: var Diagnostics, pos: Position) =
    self.report("Code is unreachable", pos)
+
+func reportCannotReturn*(self: var Diagnostics, pos: Position) =
+   self.report("Function cannot return", pos)
