@@ -408,29 +408,27 @@ func bindConditionalExpression(parent: Bound, node: Node, requireValue: bool): B
    assert node.kind == conditionalExpression
    result = Bound(kind: boundConditional, parent: parent, binder: parent.binder)
    result.conditionToken = node.conditionToken
-   result.condition =
-      if node.condition != nil:
-         result.bindExpression(node.condition)
-      else: nil
-   if result.condition != nil and result.condition.dtype.base != tbool:
-      result.binder.diagnostics.reportCannotCast(node.condition.pos, $result.condition.dtype, "bool")
+   if node.condition != nil:
+      result.condition = result.bindExpression(node.condition)
+      if result.condition.dtype.base != tbool:
+         result.binder.diagnostics.reportCannotCast(node.condition.pos, $result.condition.dtype, "bool")
    result.scope = BoundScope() # Scope for conditional
    result.conditional = result.bindExpression(node.conditional, requireValue)
-   result.scope = BoundScope() # Scope for otherwise
-   result.otherwise =
-      if node.otherwise != nil: result.bindConditionalExpression(node.otherwise, requireValue)
-      else: nil
+   if node.otherwise != nil:
+      result.scope = BoundScope() # Scope for otherwise
+      result.otherwise = result.bindConditionalExpression(node.otherwise, requireValue)
 
    if requireValue:
       result.dtype = result.conditional.dtype
-      if result.conditional.dtype.base != tvoid and node.conditionToken.kind != tokenElse:
-         if result.otherwise == nil:
-            result.binder.diagnostics.reportMissingElse(node.conditionToken.pos,
-                  $result.conditional.dtype)
-         elif result.otherwise.dtype != result.conditional.dtype:
-            result.binder.diagnostics.reportInconsistentConditionals(node.conditionToken.pos,
-                  $node.conditionToken.text, $result.conditional.dtype,
-                  $result.otherwise.conditionToken.text, $result.otherwise.dtype)
+      if node.conditionToken.kind == tokenElse:
+         discard # dtype consistency check is only done in if, elif
+      elif result.conditional.dtype.base != tvoid and result.otherwise == nil:
+         result.binder.diagnostics.reportMissingElse(node.conditionToken.pos,
+               $result.conditional.dtype)
+      elif result.otherwise != nil and result.otherwise.dtype != result.conditional.dtype:
+         result.binder.diagnostics.reportInconsistentConditionals(node.conditionToken.pos,
+               $node.conditionToken.text, $result.conditional.dtype,
+               $result.otherwise.conditionToken.text, $result.otherwise.dtype)
    else:
       result.dtype = newDtype(tvoid)
 
