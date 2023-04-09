@@ -207,15 +207,14 @@ func lexString(l: Lexer): Token =
    let value = ValueBase(dtypeBase: tstr, valStr: valStr)
    return Token(kind: tokenString, pos: start, text: text, value: value)
 
-func newToken(l: Lexer, kind: TokenKind, text = ""): Token =
-   let myText = if text.len > 0: text else: $kind
-   result = Token(kind: kind, pos: l.pos, text: myText)
-   l.advance(myText.len)
+func newToken(l: Lexer, kind: TokenKind, text: string = $kind): Token =
+   result = Token(kind: kind, pos: l.pos, text: text)
+   l.advance(text.len)
 
 func nextToken(l: Lexer): Token =
    case l.current()
    of '\0':
-      return l.newToken(tokenEof, "\0")
+      return l.newToken(tokenEof, "")
    of Letters:
       return l.lexWord
    of Digits:
@@ -236,6 +235,8 @@ func nextToken(l: Lexer): Token =
       return l.newToken(tokenColon)
    of '^':
       return l.newToken(tokenCaret)
+   of '%':
+      return l.newToken(tokenPercent)
    of '&':
       if l.peek == '&': return l.newToken(tokenAmpAmp)
       else: return l.newToken(tokenAmp)
@@ -282,6 +283,9 @@ func lex*(text: string): Lexer =
       if token.kind == tokenEof:
          break
 
+func len*(lexer: Lexer): int = return lexer.tokens.len
+
 func get*(lexer: Lexer, index: int): Token =
-   if index >= lexer.tokens.len: return lexer.tokens[^1]
+   if lexer.tokens.len == 0: return Token(kind: tokenEof)
+   elif index >= lexer.tokens.len: return lexer.tokens[^1]
    else: return lexer.tokens[index]
