@@ -14,9 +14,11 @@ type
       tokenEof = "[EOF]"
 
       tokenWhitespace = "[whitespace]"
+      tokenNewline = "[newline]"
       tokenIdentifier = "[identifier]"
       tokenNumber = "[number]"
       tokenString = "[string]"
+      tokenComment = "[#]"
 
       # Keywords (need to be added to keyword list below)
       tokenTrue = "true"
@@ -72,10 +74,11 @@ type
 
    Token* = ref object
       case kind*: TokenKind
-      of tokenNumber, tokenString: value*: ValueBase
+      of tokenNumber, tokenString, tokenComment: value * : ValueBase
       else: discard
       pos*: Position
       text*: string
+      leadingTrivia*, trailingTrivia*: seq[Token]
 
 func prettyPrint*(key, value: string): string =
    const align = 16
@@ -143,7 +146,11 @@ const
    ]
    keywords: Keywords = keywordList.toTable
 
+   whitespaceChars = {' ', '\t'}
+   newlineChars = {'\v', '\r', '\l', '\f'}
+
    literalTokens* = {tokenNumber, tokenString, tokenTrue, tokenFalse}
+   triviaTokens* = {tokenBad, tokenWhitespace, tokenNewline, tokenComment}
 
 
 func current(l: Lexer): char =
@@ -178,11 +185,17 @@ func lexNumber(l: Lexer): Token =
    let value = ValueBase(dtypeBase: tint, valInt: valInt)
    return Token(kind: tokenNumber, pos: start, text: text, value: value)
 
-func lexWhitespace(l: Lexer): Token =
+func lexWhitespaces(l: Lexer): Token =
    let start = l.pos
-   while l.current() in Whitespace: l.next
+   while l.current() in whitespaceChars: l.next
    let text = l.text.substr(start.abs, l.pos.abs - 1)
    return Token(kind: tokenWhitespace, pos: start, text: text)
+
+func lexNewlines(l: Lexer): Token =
+   let start = l.pos
+   while l.current() in newlineChars: l.next
+   let text = l.text.substr(start.abs, l.pos.abs - 1)
+   return Token(kind: tokenNewline, pos: start, text: text)
 
 func lexWord(l: Lexer): Token =
    let start = l.pos
@@ -207,6 +220,18 @@ func lexString(l: Lexer): Token =
    let value = ValueBase(dtypeBase: tstr, valStr: valStr)
    return Token(kind: tokenString, pos: start, text: text, value: value)
 
+func lexComment(l: Lexer): Token =
+   let start = l.pos
+   doAssert l.current() == '#'
+   l.next
+   while l.current() in whitespaceChars: l.next()
+   let commentTextStart = l.pos
+   while l.current() notin {'\0', '\n', '\r'}: l.next()
+   let text = l.text.substr(start.abs, l.pos.abs - 1)
+   let valStr = l.text.substr(commentTextStart.abs, l.pos.abs - 1)
+   let value = ValueBase(dtypeBase: tstr, valStr: valStr)
+   return Token(kind: tokenComment, pos: start, text: text, value: value)
+
 func newToken(l: Lexer, kind: TokenKind, text: string = $kind): Token =
    result = Token(kind: kind, pos: l.pos, text: text)
    l.advance(text.len)
@@ -219,8 +244,10 @@ func nextToken(l: Lexer): Token =
       return l.lexWord
    of Digits:
       return l.lexNumber
-   of Whitespace:
-      return l.lexWhitespace
+   of whitespaceChars:
+      return l.lexWhitespaces
+   of newlineChars:
+      return l.lexNewlines
    of '+':
       return l.newToken(tokenPlus)
    of '-':
@@ -266,6 +293,8 @@ func nextToken(l: Lexer): Token =
       return l.newToken(tokenBraceOpen)
    of '}':
       return l.newToken(tokenBraceClose)
+   of '#':
+      return l.lexComment()
    of '"':
       return l.lexString()
    else:
@@ -276,10 +305,24 @@ func nextToken(l: Lexer): Token =
 func lex*(text: string): Lexer =
    result = Lexer(text: text)
 
+   var prevToken: Token = nil
+   var isLeading = true
+   var leadingTrivia: seq[Token]
    while true:
       let token = result.nextToken()
-      if token.kind notin [tokenWhitespace, tokenBad]:
+      if token.kind notin triviaTokens:
          result.tokens.add(token)
+         token.leadingTrivia = leadingTrivia
+         leadingTrivia = newSeq[Token]()
+         isLeading = false
+         prevToken = token
+      elif token.kind == tokenNewline:
+         isLeading = true
+         leadingTrivia.add(token)
+      elif isLeading:
+         leadingTrivia.add(token)
+      else:
+         prevToken.trailingTrivia.add(token)
       if token.kind == tokenEof:
          break
 

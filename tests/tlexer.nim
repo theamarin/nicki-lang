@@ -18,7 +18,8 @@ iterator validTokens(): Token =
    for kind in TokenKind:
       var text = $kind
       case kind
-      of tokenBad, tokenEof, tokenWhitespace: continue
+      of tokenEof: continue
+      of triviaTokens: continue
       of tokenIdentifier: text = "abc"
       of tokenNumber: text = "123"
       of tokenString: text = "\"text\""
