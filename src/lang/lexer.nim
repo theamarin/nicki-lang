@@ -157,9 +157,16 @@ func current(l: Lexer): char =
    if l.pos.abs >= l.text.len: return '\0'
    return l.text[l.pos.abs]
 
+func peek(l: Lexer, n = 1): char =
+   let pos = l.pos.abs + n
+   if pos >= l.text.len: return '\0'
+   return l.text[pos]
+
 func advance(l: Lexer, n = 1) =
    for i in 0..n-1:
-      if l.current() in Newlines:
+      if l.current() == '\r' and l.peek() == '\n':
+         l.pos.column.inc
+      elif l.current() in Newlines:
          l.pos.line.inc
          l.pos.column = 0
       else: l.pos.column.inc
@@ -168,11 +175,6 @@ func advance(l: Lexer, n = 1) =
 func next(l: Lexer): Position {.discardable.} =
    result = l.pos
    l.advance()
-
-func peek(l: Lexer, n = 1): char =
-   let pos = l.pos.abs + n
-   if pos >= l.text.len: return '\0'
-   return l.text[pos]
 
 func lexNumber(l: Lexer): Token =
    let start = l.pos
@@ -302,8 +304,8 @@ func nextToken(l: Lexer): Token =
       let text: string = $l.text[l.pos.abs]
       return Token(kind: tokenBad, pos: l.next, text: text)
 
-func lex*(text: string): Lexer =
-   result = Lexer(text: text)
+func lex*(text: string, lineIdx = 0): Lexer =
+   result = Lexer(text: text, pos: Position(line: lineIdx))
 
    var prevToken: Token = nil
    var isLeading = true

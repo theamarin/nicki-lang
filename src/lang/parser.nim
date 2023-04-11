@@ -310,9 +310,9 @@ func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node =
       result.right = parser.parseOperatorExpression(precedence)
 
 
-func parse*(text: string): Parser =
+func parse*(text: string, lineIdx = 0): Parser =
    result = Parser(root: Node())
-   result.lexer = text.lex
+   result.lexer = text.lex(lineIdx)
    for r in result.lexer.diagnostics:
       result.diagnostics.add(r)
 

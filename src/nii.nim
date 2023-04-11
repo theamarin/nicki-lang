@@ -1,118 +1,66 @@
-import strutils, tables, parseopt, os
-import lang / [parser, binder, evaluator, diagnostics, identifiers, lowerer, control_flow]
-
-var showTree = false
-var showBind = false
-var showVars = false
-var filename = ""
-
-var myBinder = newBinder()
-var myEvaluator = newEvaluator(myBinder)
+import strutils, parseopt, os
+import lang/[analysis, evaluator, identifiers]
 
 const helpStr = dedent """
    nicki-lang REPL
-   Usage: nim r src/main.nim [OPTIONS] [filename]
+   Usage: nii [OPTIONS] [filename]
    Options:
-      -h, --help     Show this help
-      --parse-tree   Show parse trees
-      --bind-tree    Show bind trees
-      --show-vars    Show global-scope identifiers"""
+      -h, --help           Show this help and exit
+      --show-parse-tree    Show parse tree
+      --show-bound-tree    Show bound tree
+      --show-lowered-tree  Show lowered tree
+      --show-vars          Show global-scope identifiers"""
 
+var settings: AnalysisSettings
+var context = newContext(settings)
 
 var p = initOptParser(commandLineParams())
 for kind, key, val in p.getopt():
    case kind
-   of cmdArgument: filename = key
+   of cmdArgument: settings.filename = key
    of cmdLongOption, cmdShortOption:
       case key
       of "help", "h":
          echo helpStr
          quit(QuitSuccess)
-      of "parse-tree": showTree = true
-      of "bind-tree": showBind = true
-      of "show-vars": showVars = true
+      of "show-parse-tree": settings.showParseTree = true
+      of "show-bound-tree": settings.showBoundTree = true
+      of "show-lowered-tree": settings.showLoweredTree = true
+      of "show-vars": settings.showVars = true
       else:
          echo "Error: Unknown option " & escape(key)
          quit(QuitFailure)
    of cmdEnd: assert(false) # cannot happen
 
 
-if filename != "":
-   let f = open(filename, fmRead)
-   let data = f.readAll()
-   f.close()
-   let lines = data.splitLines()
-   var parser = data.parse()
-   if showTree: echo parser.root.asTree
-   if parser.diagnostics.len > 0:
-      for report in parser.diagnostics:
-         writeLine(stdout, lines[report.pos.line])
-         writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
-               filename & ":" & $report.pos)
-      quit(QuitFailure)
-   let bound = myBinder.bindExpression(parser.root)
-   if showBind: echo bound.asTree
-   if myBinder.diagnostics.len > 0:
-      for report in myBinder.diagnostics:
-         writeLine(stdout, lines[report.pos.line])
-         writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
-               filename & ":" & $report.pos)
-      quit(QuitFailure)
-   let lowered = bound.lower()
-
-   lowered.checkControlFlows()
-   if myBinder.diagnostics.len > 0:
-      for report in myBinder.diagnostics:
-         writeLine(stdout, lines[report.pos.line])
-         writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
-               filename & ":" & $report.pos)
-      quit(QuitFailure)
-
-   if showBind: echo lowered.asTree
-   let result = myEvaluator.evaluate(lowered)
-   if result.dtype.base != tvoid: writeline(stdout, $result)
-   quit(QuitSuccess)
-
-
 const prompt = "> "
 
 while true:
-   if showVars:
-      echo "Identifiers: "
-      for name, identifier in myBinder.root.scope.identifiers:
-         echo " " & $identifier
-
-      echo "Variables: "
-      for name, variable in myEvaluator.variables:
-         echo " " & $name & ": " & variable.typeStr & " = " & $variable
+   if settings.showVars: context.showVars()
 
    write(stdout, prompt)
    var line: string
    discard readLine(stdin, line)
    case line
    of "": echo "Quit"; break
-   of "#showTree": showTree = not showTree; echo("showTree: " & $showTree); continue
-   of "#showBind": showBind = not showBind; echo("showBind: " & $showBind); continue
-   of "#showVars": showVars = not showVars; echo("showVars: " & $showVars); continue
-   var parser = line.parse()
-   if showTree: echo parser.root.asTree
-   if parser.diagnostics.len > 0:
-      for report in parser.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos.column+prompt.len) & "^  " & report.msg)
-      parser.diagnostics.clear
+   of "#parseTree":
+      settings.showParseTree = not settings.showParseTree
+      echo("showParseTree: " & $settings.showParseTree)
+      continue
+   of "#boundTree":
+      settings.showBoundTree = not settings.showBoundTree
+      echo("showBoundTree: " & $settings.showBoundTree)
+      continue
+   of "#loweredTree":
+      settings.showLoweredTree = not settings.showLoweredTree
+      echo("showLoweredTree: " & $settings.showLoweredTree)
+      continue
+   of "#vars":
+      settings.showVars = not settings.showVars
+      echo("settings.showVars: " & $settings.showVars)
       continue
 
-   let identifiersBackup = myBinder.root.scope.identifiers
-   let bound = myBinder.bindExpression(parser.root)
-   if showBind: echo bound.asTree
-   if myBinder.diagnostics.len > 0:
-      for report in myBinder.diagnostics:
-         writeLine(stdout, " ".repeat(report.pos.column+prompt.len) & "^  " & report.msg)
-      myBinder.diagnostics.clear
-      myBinder.root.scope.identifiers = identifiersBackup # Reset scope on error
-      continue
-   let lowered = bound.lower()
-   if showBind: echo lowered.asTree
+   let bound = context.analyze(line)
 
-   let result = myEvaluator.evaluate(lowered)
-   if result.dtype.base != tvoid: writeline(stdout, $result)
+   let result = evaluate(context.evaluator, bound)
+   if result.dtype.base notin {tvoid, terror}: writeline(stdout, $result)

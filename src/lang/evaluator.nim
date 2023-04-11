@@ -39,9 +39,9 @@ func toValue*(self: ValueBase): Value =
    else: raiseUnexpectedDtypeException($self.dtypeBase, "conversion to value")
 
 
-func evaluate*(self: var Evaluator, node: Bound): Value
+func evaluate*(self: Evaluator, node: Bound): Value
 
-func evaluateBinaryOperator(self: var Evaluator, node: Bound): Value =
+func evaluateBinaryOperator(self: Evaluator, node: Bound): Value =
    assert node.kind == boundBinaryOperator
    let left = self.evaluate(node.binaryLeft)
    let right = self.evaluate(node.binaryRight)
@@ -67,7 +67,7 @@ func evaluateBinaryOperator(self: var Evaluator, node: Bound): Value =
    of boundBinaryLogicalXor: return left xor right
 
 
-func evaluateBlock*(self: var Evaluator, node: Bound): Value =
+func evaluateBlock*(self: Evaluator, node: Bound): Value =
    assert node.kind == boundBlock
    var scope = Evaluator(parent: self)
    var labelToIndex = newTable[BoundLabel, int]()
@@ -98,7 +98,7 @@ func evaluateBlock*(self: var Evaluator, node: Bound): Value =
       index.inc()
    return lastValue
 
-func evaluate*(self: var Evaluator, node: Bound): Value =
+func evaluate*(self: Evaluator, node: Bound): Value =
    case node.kind
    of boundError: return Value(dtype: Dtype(base: terror))
    of boundRoot: return Value(dtype: Dtype(base: terror))
