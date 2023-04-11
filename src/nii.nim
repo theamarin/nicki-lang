@@ -1,5 +1,5 @@
 import strutils, tables, parseopt, os
-import parser, binder, evaluator, diagnostics, identifiers, lowerer, control_flow
+import lang / [parser, binder, evaluator, diagnostics, identifiers, lowerer, control_flow]
 
 var showTree = false
 var showBind = false

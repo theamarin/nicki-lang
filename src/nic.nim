@@ -1,6 +1,5 @@
 import strutils, parseopt, os
-import parser, binder, diagnostics, lowerer
-import cwriter
+import lang / [parser, binder, diagnostics, lowerer, cwriter]
 
 var showTree = false
 var showBind = false

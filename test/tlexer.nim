@@ -1,5 +1,5 @@
 import unittest, strutils
-import ../src/lexer
+import ../src/lang/lexer
 
 proc assertEquals(input: string, expected: seq[Token]) =
    var l = lex(input)
