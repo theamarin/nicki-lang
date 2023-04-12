@@ -1,4 +1,4 @@
-import strutils, tables
+import strutils, tables, os
 import parser, binder, diagnostics, lowerer, control_flow, identifiers, evaluator
 
 export BoundKind
@@ -40,10 +40,11 @@ proc showVars*(context: AnalysisContext) =
 
 proc showReport(context: AnalysisContext, report: Report) =
    if context.sourceText.filename.len > 0:
-      writeLine(stdout, context.sourceText.lines[report.pos.line])
-      writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
-            context.sourceText.filename & ":" & $report.pos & " [" & $report.kind & "]")
-   if report.pos.line == context.sourceText.lines.len - 1:
+      writeLine(stdout, context.sourceText.filename.absolutePath, ":" & $report.pos & ": error: " &
+            report.msg & " [" & $report.kind & "]")
+      writeLine(stdout, "   " & context.sourceText.lines[report.pos.line])
+      writeLine(stdout, "   " & " ".repeat(report.pos.column) & "^")
+   elif report.pos.line == context.sourceText.lines.len - 1:
       writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg & " [" &
             $report.kind & "]")
    else:
