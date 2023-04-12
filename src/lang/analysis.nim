@@ -3,8 +3,11 @@ import parser, binder, diagnostics, lowerer, control_flow, identifiers, evaluato
 
 export BoundKind
 
-type AnalysisSettings* = object
+type SourceText* = object
    filename*: string
+   lines: seq[string]
+
+type AnalysisSettings* = object
    showParseTree*: bool
    showBoundTree*: bool
    showLoweredTree*: bool
@@ -14,16 +17,17 @@ type AnalysisSettings* = object
 type AnalysisContext* = object
    binder: Binder
    evaluator*: Evaluator
-   settings: AnalysisSettings
-   lines: seq[string]
+   settings*: AnalysisSettings
+   sourceText*: SourceText
 
-func newSettings*(): AnalysisSettings =
+func newSettings(): AnalysisSettings =
    return AnalysisSettings(doLower: true)
 
-func newContext*(settings: AnalysisSettings): AnalysisContext =
+func newContext*(): AnalysisContext =
+   let s = newSettings()
    let b = newBinder()
    let e = newEvaluator(b)
-   return AnalysisContext(settings: settings, binder: b, evaluator: e)
+   return AnalysisContext(settings: s, binder: b, evaluator: e)
 
 proc showVars*(context: AnalysisContext) =
    echo "Identifiers: "
@@ -35,15 +39,15 @@ proc showVars*(context: AnalysisContext) =
       echo " " & $name & ": " & variable.typeStr & " = " & $variable
 
 proc showReport(context: AnalysisContext, report: Report) =
-   if context.settings.filename.len > 0:
-      writeLine(stdout, context.lines[report.pos.line])
+   if context.sourceText.filename.len > 0:
+      writeLine(stdout, context.sourceText.lines[report.pos.line])
       writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
-            context.settings.filename & ":" & $report.pos & " [" & $report.kind & "]")
-   if report.pos.line == context.lines.len - 1:
+            context.sourceText.filename & ":" & $report.pos & " [" & $report.kind & "]")
+   if report.pos.line == context.sourceText.lines.len - 1:
       writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg & " [" &
             $report.kind & "]")
    else:
-      writeLine(stdout, "  " & context.lines[report.pos.line])
+      writeLine(stdout, "  " & context.sourceText.lines[report.pos.line])
       writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg & " in line " &
             $report.pos.line & " [" & $report.kind & "]")
 
@@ -57,8 +61,8 @@ proc showDiagnostics(context: AnalysisContext, diagnostics: var Diagnostics): bo
 proc analyze*(context: var AnalysisContext, data: string): Bound =
    let settings = context.settings
    let lines = data.splitLines()
-   var myParser = data.parse(context.lines.len)
-   context.lines.add(lines)
+   var myParser = data.parse(context.sourceText.lines.len)
+   context.sourceText.lines.add(lines)
    if settings.showParseTree: echo myParser.root.asTree()
    if context.showDiagnostics(myParser.diagnostics):
       return Bound(kind: boundError)

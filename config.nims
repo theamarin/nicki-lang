@@ -7,3 +7,6 @@ task build, "Build CLIs":
 
 task run, "Run interpreter":
   exec r"nim --r --verbosity:0 --nimcache:.nimcache c -o:bin/nii src/nii.nim"
+
+task runc, "Run compiler":
+  exec r"nim --r --verbosity:0 --nimcache:.nimcache c -o:bin/nic src/nic.nim"
