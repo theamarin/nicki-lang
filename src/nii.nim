@@ -3,7 +3,7 @@ import lang/[analysis, evaluator, identifiers]
 
 const helpStr = dedent """
    nicki-lang REPL
-   Usage: nii [OPTIONS]
+   Usage: nii [OPTIONS] [filename]
    Options:
       -h, --help           Show this help and exit
       --show-parse-tree    Show parse tree
@@ -16,9 +16,7 @@ var context = newContext()
 var p = initOptParser(commandLineParams())
 for kind, key, val in p.getopt():
    case kind
-   of cmdArgument:
-      echo "Error: Unknown argument " & escape(key)
-      quit(QuitFailure)
+   of cmdArgument: context.sourceText.filename = key
    of cmdLongOption, cmdShortOption:
       case key
       of "help", "h":
@@ -32,6 +30,22 @@ for kind, key, val in p.getopt():
          echo "Error: Unknown option " & escape(key)
          quit(QuitFailure)
    of cmdEnd: assert(false) # cannot happen
+
+
+
+if context.sourceText.filename.len > 0:
+   let f = open(context.sourceText.filename, fmRead)
+   let data = f.readAll()
+   f.close()
+
+   let bound = context.analyze(data)
+   if bound.kind == boundError:
+      quit(QuitFailure)
+
+   let result = evaluate(context.evaluator, bound)
+   if result.dtype.base notin {tvoid, terror}: writeline(stdout, $result)
+
+   quit(QuitSuccess)
 
 
 const prompt = "> "
@@ -62,6 +76,7 @@ while true:
       continue
 
    let bound = context.analyze(line)
+   if bound.kind == boundError: continue
 
    let result = evaluate(context.evaluator, bound)
    if result.dtype.base notin {tvoid, terror}: writeline(stdout, $result)
