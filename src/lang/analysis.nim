@@ -38,13 +38,14 @@ proc showReport(context: AnalysisContext, report: Report) =
    if context.settings.filename.len > 0:
       writeLine(stdout, context.lines[report.pos.line])
       writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
-            context.settings.filename & ":" & $report.pos)
+            context.settings.filename & ":" & $report.pos & " [" & $report.kind & "]")
    if report.pos.line == context.lines.len - 1:
-      writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg)
+      writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg & " [" &
+            $report.kind & "]")
    else:
       writeLine(stdout, "  " & context.lines[report.pos.line])
       writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg & " in line " &
-            $report.pos.line)
+            $report.pos.line & " [" & $report.kind & "]")
 
 proc showDiagnostics(context: AnalysisContext, diagnostics: var Diagnostics): bool =
    for report in diagnostics: context.showReport(report)
