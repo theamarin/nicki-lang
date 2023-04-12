@@ -34,20 +34,20 @@ proc showVars*(context: AnalysisContext) =
    for name, variable in context.evaluator.variables:
       echo " " & $name & ": " & variable.typeStr & " = " & $variable
 
-proc showReport(context: AnalysisContext, report: Report, lines: seq[string]) =
+proc showReport(context: AnalysisContext, report: Report) =
    if context.settings.filename.len > 0:
-      writeLine(stdout, lines[report.pos.line])
+      writeLine(stdout, context.lines[report.pos.line])
       writeLine(stdout, " ".repeat(report.pos.column) & "^  " & report.msg & " in " &
             context.settings.filename & ":" & $report.pos)
-   if report.pos.line == lines.len - 1:
+   if report.pos.line == context.lines.len - 1:
       writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg)
    else:
-      writeLine(stdout, "  " & lines[report.pos.line])
+      writeLine(stdout, "  " & context.lines[report.pos.line])
       writeLine(stdout, "  " & " ".repeat(report.pos.column) & "^  " & report.msg & " in line " &
             $report.pos.line)
 
 proc showDiagnostics(context: AnalysisContext, diagnostics: var Diagnostics): bool =
-   for report in diagnostics: context.showReport(report, context.lines)
+   for report in diagnostics: context.showReport(report)
    if diagnostics.len > 0:
       diagnostics.clear()
       return true
