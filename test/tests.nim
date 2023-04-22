@@ -1,2 +1,2 @@
 {.warning[UnusedImport]: off.}
-import tlexer
+import tlexer, texamples
