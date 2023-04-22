@@ -74,7 +74,8 @@ type
 
    Token* = ref object
       case kind*: TokenKind
-      of tokenNumber, tokenString, tokenComment: value * : ValueBase
+      of tokenNumber, tokenString, tokenComment:
+         value*: ValueBase
       else: discard
       pos*: Position
       text*: string
