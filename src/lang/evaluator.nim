@@ -24,7 +24,7 @@ func tryLookup*(self: Evaluator, identifier: Identifier): Variable =
    else: raise (ref KeyError)(msg: "Undefined identifier " & escape(identifier.name))
 
 func typeVariable(base: DtypeBase): Variable =
-   Variable(value: Value(dtype: Dtype(base: ttype), valDtype: Dtype(base: base)))
+   Variable(value: Value(dtype: Dtype(base: ttype, dtype: newDtype(base))))
 
 func addBaseDtypes*(self: Evaluator, bound: Bound) =
    for dtypeBase in DtypeBase:
@@ -111,6 +111,8 @@ func evaluate*(self: Evaluator, node: Bound): Value =
       of boundUnaryNot: return self.evaluate(node.unaryOperand).logicalNot
    of boundBinaryOperator:
       return self.evaluateBinaryOperator(node)
+   of boundStruct:
+      return Value(pos: node.pos, dtype: node.dtype)
    of boundAssignment:
       let rvalue = self.evaluate(node.rvalue)
       let variable = self.tryLookup(node.lvalue)

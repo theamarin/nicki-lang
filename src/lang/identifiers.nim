@@ -31,7 +31,7 @@ type
          parameters*: seq[Identifier]
          hasImplementation*: bool
       of tstruct:
-         members*: OrderedTable[string, Dtype]
+         members*: seq[Identifier]
       of tenum:
          enumerals*: OrderedTable[int, string]
 

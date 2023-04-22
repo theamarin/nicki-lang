@@ -8,9 +8,8 @@ type
       valBool*: bool
       valInt*: int
       valStr*: string
-      valDtype*: Dtype
       valEnum*: int
-      structMembers*: OrderedTable[string, Value]
+      structMembers*: seq[Value]
 
 
 func `$`*(val: Value): string =
@@ -20,9 +19,13 @@ func `$`*(val: Value): string =
    of tbool: return $val.valBool
    of tint: return $val.valInt
    of tstr: return $val.valStr
-   of ttype: return $val.valDtype
+   of ttype: return $val.dtype
    of tfunc: return "[func]"
-   of tstruct: return "[struct]"
+   of tstruct:
+      var res: seq[string]
+      for member in val.structMembers:
+         res.add($member)
+      return "{" & res.join(", ") & "}"
    of tenum: return "[enum]"
 
 

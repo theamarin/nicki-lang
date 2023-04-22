@@ -25,6 +25,9 @@ func lowerBinaryOperator(bound: Bound): Bound =
          binaryRight: right)
    result.inherit(bound)
 
+func lowerStruct(bound: Bound): Bound =
+   return bound
+
 func lowerAssignment(bound: Bound): Bound =
    let rvalue = bound.rvalue.lower()
    if rvalue == bound.rvalue: return bound
@@ -167,6 +170,8 @@ func lower*(bound: Bound): Bound =
       result = lowerUnaryOperator(bound)
    of boundBinaryOperator:
       result = lowerBinaryOperator(bound)
+   of boundStruct:
+      result = lowerStruct(bound)
    of boundAssignment:
       result = lowerAssignment(bound)
    of boundDefinition:

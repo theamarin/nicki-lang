@@ -14,6 +14,7 @@ type
       parameterExpression = "parameter expression"
       definitionExpression = "definition expression"
       assignmentExpression = "assignment expression"
+      structExpression = "struct expression"
       callArgumentExpression = "call argument expression"
       callExpression = "call expression"
       conditionalExpression = "conditional expression"
@@ -57,6 +58,11 @@ type
          lvalue*: Token
          assignmentToken*: Token
          rvalue*: Node
+      of structExpression:
+         structToken*: Token
+         structParanOpen*: Token
+         structDefinitions*: seq[Node]
+         structParanClose*: Token
       of callArgumentExpression:
          callArgSeparator*: Token
          callArgIdentifier*: Token
@@ -100,7 +106,8 @@ func pos*(node: Node): Position =
    for key, value in fieldPairs(node[]):
       when key == "kind": discard
       elif value is seq: return value[0].pos
-      else: return value.pos
+      else:
+         if not value.isNil: return value.pos
    return Position()
 
 func asTree*(token: Token): string = $token
@@ -161,6 +168,7 @@ func matchToken(parser: var Parser, kinds: set[TokenKind], expression: NodeKind)
 func parseAssignmentExpression(parser: var Parser): Node
 func parseOperatorExpression(parser: var Parser, parentPrecedence = 0): Node
 func parsePrimaryExpression(parser: var Parser): Node
+func parseDefinitionExpression(parser: var Parser, matchDefToken = true): Node
 
 func parseExpression(parser: var Parser): Node = parser.parseAssignmentExpression
 
@@ -203,9 +211,18 @@ func parseParameterExpression(parser: var Parser, isFirst: bool): Node =
    result.parameterColon = parser.matchToken(tokenColon, result.kind)
    result.parameterDtype = parser.matchToken(tokenIdentifier, result.kind)
 
-func parseDefinitionExpression(parser: var Parser): Node =
+func parseStructExpression(parser: var Parser): Node =
+   result = Node(kind: structExpression)
+   result.structToken = parser.matchToken(tokenStruct, result.kind)
+   result.structParanOpen = parser.matchToken(tokenBraceOpen, result.kind)
+   while parser.current.kind == tokenIdentifier:
+      result.structDefinitions.add(parseDefinitionExpression(parser, false))
+   result.structParanClose = parser.matchToken(tokenBraceClose, result.kind)
+
+func parseDefinitionExpression(parser: var Parser, matchDefToken = true): Node =
    result = Node(kind: definitionExpression)
-   result.defToken = parser.matchToken(tokenDef, result.kind)
+   if matchDefToken:
+      result.defToken = parser.matchToken(tokenDef, result.kind)
    result.defIdentifier = parser.matchToken(tokenIdentifier, result.kind)
    if parser.current.kind == tokenParanthesisOpen:
       # Function definition
@@ -224,6 +241,8 @@ func parseDefinitionExpression(parser: var Parser): Node =
       result.defAssignToken = parser.matchToken(tokenEquals, result.kind)
       if result.defParameterClose != nil:
          result.defAssignExpression = parser.parseBlockExpression()
+      elif parser.current.kind == tokenStruct:
+         result.defAssignExpression = parser.parseStructExpression()
       else:
          result.defAssignExpression = parser.parseExpression()
    if result.defColon == nil and result.defAssignToken == nil:

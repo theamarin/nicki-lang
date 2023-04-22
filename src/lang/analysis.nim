@@ -36,7 +36,7 @@ proc showVars*(context: AnalysisContext) =
 
    echo "Variables: "
    for name, variable in context.evaluator.variables:
-      echo " " & $name & ": " & variable.typeStr & " = " & $variable
+      echo " " & $name & " = " & $variable
 
 proc showReport(context: AnalysisContext, report: Report) =
    if context.sourceText.filename.len > 0:

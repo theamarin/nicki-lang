@@ -32,11 +32,11 @@ type
       tokenFor = "for"
       tokenWhile = "while"
       tokenDef = "def"
-      # tokenType = "type"
       tokenConst = "const"
       tokenPublic = "public"
       tokenObject = "object"
       tokenEnum = "enum"
+      tokenStruct = "struct"
       tokenContinue = "continue"
       tokenBreak = "break"
       tokenReturn = "return"
@@ -134,11 +134,11 @@ const
       ("for", tokenFor),
       ("while", tokenWhile),
       ("def", tokenDef),
-      # ("type", tokenType),
       ("const", tokenConst),
       ("public", tokenPublic),
       ("object", tokenObject),
       ("enum", tokenEnum),
+      ("struct", tokenStruct),
       ("continue", tokenContinue),
       ("break", tokenBreak),
       ("return", tokenReturn),

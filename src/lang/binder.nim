@@ -11,6 +11,7 @@ type
       boundIdentifier = "identifier"
       boundUnaryOperator = "unary"
       boundBinaryOperator = "binary"
+      boundStruct = "struct"
       boundAssignment = "assignment"
       boundDefinition = "definition"
       boundFunctionCall = "function call"
@@ -35,6 +36,7 @@ type
       parent*: Bound
       binder*: Binder
       dtype*: Dtype
+      node*: Node
       case kind*: BoundKind
       of boundError:
          errorToken*: Token
@@ -52,13 +54,16 @@ type
          binaryLeft*: Bound
          binaryOperator*: BoundBinaryOperatorKind
          binaryRight*: Bound
+      of boundStruct:
+         structToken*: Token
+         structMembers*: seq[Bound] # similar to dtype.dtype.members
       of boundAssignment:
          lvalue*: Identifier
          assignmentToken*: Token
          rvalue*: Bound
       of boundDefinition:
          defIdentifier*: Identifier
-         defDtype*: Dtype
+         defDtype*: Dtype # same as defIdentifier.dtype
          defInitialization*: Bound
       of boundFunctionCall:
          callIdentifier*: Identifier
@@ -174,10 +179,13 @@ func addBaseDtypes*(self: Bound) =
       discard self.tryDeclare(toIdentifier(dtype))
 
 func pos*(node: Bound): Position =
+   if not node.node.isNil: return node.node.pos
    for key, value in fieldPairs(node[]):
       when key in ["kind", "scope", "parent", "binder"]: discard
       elif value is seq: return value[0].pos
       elif value is Token or value is Node or value is Bound:
+         if not value.isNil: return value.pos
+      elif value is Identifier:
          if not value.isNil: return value.pos
       else: discard
    raise (ref Exception)(msg: "No position for bound " & escape($node.kind))
@@ -197,6 +205,8 @@ func asCode*(bound: Bound): string =
       return bound.unaryOperator.asCode & " " & bound.unaryOperand.asCode
    of boundBinaryOperator:
       return bound.binaryLeft.asCode & bound.binaryOperator.asCode & bound.binaryRight.asCode
+   of boundStruct:
+      return bound.structToken.asCode & "{" & "}"
    of boundAssignment:
       return bound.lvalue.asCode & bound.assignmentToken.asCode & bound.rvalue.asCode
    of boundDefinition:
@@ -252,17 +262,19 @@ func toDtype*(bound: Bound, dtypeToken: Token): Dtype =
    else: return newDtype(id.dtype.dtype)
 
 
+
 func bindExpression*(bound: Bound, node: Node, requireValue = true): Bound
 func bindBlockExpression(parent: Bound, node: Node): Bound
+func bindDefinitionExpression(parent: Bound, node: Node): Bound
 
 func bindErrorExpression(parent: Bound, node: Node): Bound =
    assert node.kind == errorExpression
-   return Bound(kind: boundError, parent: parent, binder: parent.binder,
+   return Bound(kind: boundError, parent: parent, binder: parent.binder, node: node,
          errorToken: node.errorToken)
 
 func bindLiteralExpression(parent: Bound, node: Node): Bound =
    assert node.kind == literalExpression
-   result = Bound(kind: boundLiteral, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundLiteral, parent: parent, binder: parent.binder, node: node)
    case node.literal.kind
    of tokenNumber:
       result.value = node.literal.value
@@ -278,7 +290,7 @@ func bindLiteralExpression(parent: Bound, node: Node): Bound =
 func bindIdentifierExpression(parent: Bound, node: Node): Bound =
    assert node.kind == identifierExpression
    assert node.identifier.kind == tokenIdentifier
-   result = Bound(kind: boundIdentifier, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundIdentifier, parent: parent, binder: parent.binder, node: node)
    let name = node.identifier.text
    result.identifier = result.tryLookup(name)
    if result.identifier != nil:
@@ -289,7 +301,7 @@ func bindIdentifierExpression(parent: Bound, node: Node): Bound =
 
 func bindUnaryExpression(parent: Bound, node: Node): Bound =
    assert node.kind == unaryExpression
-   result = Bound(kind: boundUnaryOperator, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundUnaryOperator, parent: parent, binder: parent.binder, node: node)
    result.unaryOperand = result.bindExpression(node.unaryOperand)
    let (operatorKind, resultDtype) = getUnaryOperator(result.binder.diagnostics,
          node.unaryOperator, result.unaryOperand.dtype)
@@ -298,7 +310,7 @@ func bindUnaryExpression(parent: Bound, node: Node): Bound =
 
 func bindBinaryExpression(parent: Bound, node: Node): Bound =
    assert node.kind == binaryExpression
-   result = Bound(kind: boundBinaryOperator, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundBinaryOperator, parent: parent, binder: parent.binder, node: node)
    result.binaryLeft = result.bindExpression(node.left)
    result.binaryRight = result.bindExpression(node.right)
    let (operatorKind, resultDtype) = getBinaryOperator(result.binder.diagnostics,
@@ -309,7 +321,7 @@ func bindBinaryExpression(parent: Bound, node: Node): Bound =
 func bindAssignmentExpression(parent: Bound, node: Node): Bound =
    assert node.kind == assignmentExpression
    assert node.lvalue.kind == tokenIdentifier
-   result = Bound(kind: boundAssignment, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundAssignment, parent: parent, binder: parent.binder, node: node)
    result.lvalue = result.tryLookup(node.lvalue.text)
    result.assignmentToken = node.assignmentToken
    result.rvalue = result.bindExpression(node.rvalue)
@@ -330,10 +342,20 @@ func bindParameter(bound: Bound, node: Node): Identifier =
       bound.binder.diagnostics.reportUndefinedIdentifier(node.parameterDtype.pos,
             node.parameterDtype.text)
 
+func bindStructExpression(parent: Bound, node: Node): Bound =
+   assert node.kind == structExpression
+   result = Bound(kind: boundStruct, parent: parent, binder: parent.binder, node: node)
+   result.dtype = newDtype(ttype)
+   result.dtype.dtype = newDtype(tstruct)
+   for member in node.structDefinitions:
+      let boundMember = result.bindDefinitionExpression(member)
+      result.structMembers.add(boundMember)
+      result.dtype.dtype.members.add(boundMember.defIdentifier)
+
 func bindVariableDefinitonExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
    assert node.defParameterOpen == nil
-   result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder, node: node)
    result.dtype = newDtype(tvoid)
    if node.defDtype != nil:
       result.defDtype = result.toDtype(node.defDtype)
@@ -348,7 +370,7 @@ func bindVariableDefinitonExpression(parent: Bound, node: Node): Bound =
 func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
    assert node.defParameterOpen != nil
-   result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder, node: node)
    result.dtype = newDtype(tvoid)
    result.defDtype = newDtype(tfunc)
    result.scope = BoundScope(functionContext: result)
@@ -370,12 +392,12 @@ func bindDefinitionExpression(parent: Bound, node: Node): Bound =
    else:
       result = bindFunctionDefinitionExpression(parent, node)
    result.defIdentifier = Identifier(name: node.defIdentifier.text, dtype: result.defDtype,
-         pos: node.defToken.pos)
+         pos: node.defIdentifier.pos)
    parent.tryDeclare(result.defIdentifier)
 
 func bindCallExpression(parent: Bound, node: Node): Bound =
    assert node.kind == callExpression
-   result = Bound(kind: boundFunctionCall, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundFunctionCall, parent: parent, binder: parent.binder, node: node)
    result.callIdentifier = result.tryLookup(node.callIdentifier.text)
    if result.callIdentifier == nil:
       result.binder.diagnostics.reportUndefinedIdentifier(node.callIdentifier.pos,
@@ -406,7 +428,7 @@ func bindCallExpression(parent: Bound, node: Node): Bound =
 
 func bindConditionalExpression(parent: Bound, node: Node, requireValue: bool): Bound =
    assert node.kind == conditionalExpression
-   result = Bound(kind: boundConditional, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundConditional, parent: parent, binder: parent.binder, node: node)
    result.conditionToken = node.conditionToken
    if node.condition != nil:
       result.condition = result.bindExpression(node.condition)
@@ -434,7 +456,7 @@ func bindConditionalExpression(parent: Bound, node: Node, requireValue: bool): B
 
 func bindWhileExpression(parent: Bound, node: Node): Bound =
    assert node.kind == whileExpression
-   result = Bound(kind: boundWhileLoop, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundWhileLoop, parent: parent, binder: parent.binder, node: node)
    result.whileCondition = result.bindExpression(node.whileCondition)
    result.scope = BoundScope(loopContext: result)
    result.whileBody = result.bindExpression(node.whileBody)
@@ -442,7 +464,7 @@ func bindWhileExpression(parent: Bound, node: Node): Bound =
 
 func bindReturnExpression(parent: Bound, node: Node): Bound =
    assert node.kind == returnExpression
-   result = Bound(kind: boundReturn, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundReturn, parent: parent, binder: parent.binder, node: node)
    let functionContext = parent.getFunctionContext()
    if functionContext.isNil:
       parent.binder.diagnostics.reportReturnOutsideFunction(node.returnToken.pos)
@@ -459,7 +481,7 @@ func bindReturnExpression(parent: Bound, node: Node): Bound =
 
 func bindBlockExpression(parent: Bound, node: Node): Bound =
    assert node.kind == blockExpression
-   result = Bound(kind: boundBlock, parent: parent, binder: parent.binder)
+   result = Bound(kind: boundBlock, parent: parent, binder: parent.binder, node: node)
    result.scope = BoundScope()
    for expression in node.blockExpressions:
       result.blockExpressions.add(result.bindExpression(expression, requireValue = false))
@@ -484,6 +506,8 @@ func bindExpression*(bound: Bound, node: Node, requireValue = true): Bound =
       return bound.bindAssignmentExpression(node)
    of parameterExpression:
       raise (ref Exception)(msg: "Unexpected parameter expression")
+   of structExpression:
+      return bound.bindStructExpression(node)
    of definitionExpression:
       if requireValue: bound.binder.diagnostics.reportRequireValue(node.pos)
       return bound.bindDefinitionExpression(node)
@@ -508,5 +532,5 @@ func bindExpression*(binder: Binder, node: Node): Bound =
 
 func newBinder*(parent: BoundScope = nil): Binder =
    result = Binder()
-   result.root = Bound(kind: boundRoot, scope: BoundScope(), binder: result)
+   result.root = Bound(kind: boundRoot, scope: BoundScope(), binder: result, node: nil)
    result.root.addBaseDtypes()

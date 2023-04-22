@@ -44,6 +44,10 @@ func compile*(bound: Bound): seq[string] =
       of boundBinaryLogicalOr: result.add("||")
       of boundBinaryLogicalXor: result.add("^")
       result.add(bound.binaryRight.compile().join(" "))
+   of boundStruct:
+      for idx, expression in bound.structMembers:
+         var exp = expression.compile.join(" ") & ";"
+         result.add(exp)
    of boundAssignment:
       result.add(bound.lvalue.name)
       result.add("=")
