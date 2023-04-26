@@ -1,5 +1,5 @@
 import tables, strutils
-import identifiers, lexer, evaluator_ops, binder
+import identifiers, evaluator_ops, binder
 export evaluator_ops
 
 type
@@ -30,14 +30,6 @@ func addBaseDtypes*(self: Evaluator, bound: Bound) =
    for dtypeBase in DtypeBase:
       let identifier = bound.scope.identifiers[$dtypeBase]
       self.variables[identifier] = typeVariable(dtypeBase)
-
-func toValue*(self: ValueBase): Value =
-   case self.dtypeBase
-   of tbool: return Value(dtype: Dtype(base: tbool), valBool: self.valBool)
-   of tint: return Value(dtype: Dtype(base: tint), valInt: self.valInt)
-   of tstr: return Value(dtype: Dtype(base: tstr), valStr: self.valStr)
-   else: raiseUnexpectedDtypeException($self.dtypeBase, "conversion to value")
-
 
 func evaluate*(self: Evaluator, node: Bound): Value
 
@@ -102,7 +94,7 @@ func evaluate*(self: Evaluator, node: Bound): Value =
    case node.kind
    of boundError: return Value(dtype: Dtype(base: terror))
    of boundRoot: return Value(dtype: Dtype(base: terror))
-   of boundLiteral: return node.value.toValue
+   of boundLiteral: return node.value
    of boundIdentifier: return self.tryLookup(node.identifier).value
    of boundUnaryOperator:
       case node.unaryOperator

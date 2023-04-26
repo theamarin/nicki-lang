@@ -1,32 +1,4 @@
-import strutils, identifiers, tables
-import diagnostics
-
-type
-   Value* = ref object
-      pos*: Position
-      dtype*: Dtype
-      valBool*: bool
-      valInt*: int
-      valStr*: string
-      valEnum*: int
-      structMembers*: seq[Value]
-
-
-func `$`*(val: Value): string =
-   case val.dtype.base
-   of terror: return "[error]"
-   of tvoid: return "[void]"
-   of tbool: return $val.valBool
-   of tint: return $val.valInt
-   of tstr: return $val.valStr
-   of ttype: return $val.dtype
-   of tfunc: return "[func]"
-   of tstruct:
-      var res: seq[string]
-      for member in val.structMembers:
-         res.add($member)
-      return "{" & res.join(", ") & "}"
-   of tenum: return "[enum]"
+import strutils, identifiers
 
 
 func raiseUnexpectedDtypeException*(dtype: string, operation: string) =

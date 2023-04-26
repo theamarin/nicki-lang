@@ -1,14 +1,7 @@
 import strutils, tables
-import identifiers, diagnostics
+import diagnostics
 
 type
-   ValueBase* = ref object
-      case dtypeBase*: DtypeBase
-      of tbool: valBool*: bool
-      of tint: valInt*: int
-      of tstr: valStr*: string
-      else: discard
-
    TokenKind* = enum
       tokenBad = "[BAD]"
       tokenEof = "[EOF]"
@@ -74,8 +67,10 @@ type
 
    Token* = ref object
       case kind*: TokenKind
-      of tokenNumber, tokenString, tokenComment:
-         value*: ValueBase
+      of tokenNumber:
+         valInt*: int
+      of tokenString, tokenComment:
+         valStr*: string
       else: discard
       pos*: Position
       text*: string
@@ -88,19 +83,19 @@ func prettyPrint*(key, value: string): string =
       result &= " ".repeat(align - key.len)
    result &= " " & value
 
-func `$`*(val: ValueBase): string =
-   case val.dtypeBase
-   of tbool: return $val.valBool
-   of tint: return $val.valInt
-   of tstr: return $val.valStr
-   else: return "[" & $val.dtypeBase & "]"
+# func `$`*(val: TokenValue): string =
+#    case val.dtypeBase
+#    of tbool: return $val.valBool
+#    of tint: return $val.valInt
+#    of tstr: return $val.valStr
+#    else: return "[" & $val.dtypeBase & "]"
 
-func asCode*(val: ValueBase): string =
-   case val.dtypeBase
-   of tbool: return $val.valBool
-   of tint: return $val.valInt
-   of tstr: return escape(val.valStr)
-   else: return "[" & $val.dtypeBase & "]"
+# func asCode*(val: TokenValue): string =
+#    case val.dtypeBase
+#    of tbool: return $val.valBool
+#    of tint: return $val.valInt
+#    of tstr: return escape(val.valStr)
+#    else: return "[" & $val.dtypeBase & "]"
 
 func `$`*(token: Token): string =
    if token.isNil: return ""
@@ -185,8 +180,7 @@ func lexNumber(l: Lexer): Token =
       try: parseInt(text)
       except ValueError:
          l.diagnostics.reportCannotParseNumber(start, text); 0
-   let value = ValueBase(dtypeBase: tint, valInt: valInt)
-   return Token(kind: tokenNumber, pos: start, text: text, value: value)
+   return Token(kind: tokenNumber, pos: start, text: text, valInt: valInt)
 
 func lexWhitespaces(l: Lexer): Token =
    let start = l.pos
@@ -220,8 +214,7 @@ func lexString(l: Lexer): Token =
       l.diagnostics.reportUnterminatedString(start)
    let text = l.text.substr(start.abs, l.pos.abs - 1)
    let valStr = l.text.substr(start.abs+1, l.pos.abs - 2)
-   let value = ValueBase(dtypeBase: tstr, valStr: valStr)
-   return Token(kind: tokenString, pos: start, text: text, value: value)
+   return Token(kind: tokenString, pos: start, text: text, valStr: valStr)
 
 func lexComment(l: Lexer): Token =
    let start = l.pos
@@ -232,8 +225,7 @@ func lexComment(l: Lexer): Token =
    while l.current() notin {'\0', '\n', '\r'}: l.next()
    let text = l.text.substr(start.abs, l.pos.abs - 1)
    let valStr = l.text.substr(commentTextStart.abs, l.pos.abs - 1)
-   let value = ValueBase(dtypeBase: tstr, valStr: valStr)
-   return Token(kind: tokenComment, pos: start, text: text, value: value)
+   return Token(kind: tokenComment, pos: start, text: text, valStr: valStr)
 
 func newToken(l: Lexer, kind: TokenKind, text: string = $kind): Token =
    result = Token(kind: kind, pos: l.pos, text: text)

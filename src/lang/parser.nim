@@ -111,7 +111,6 @@ func pos*(node: Node): Position =
    return Position()
 
 func asTree*(token: Token): string = $token
-func asTree*(val: ValueBase): string = $val
 
 func asTree*(node: Node): string =
    if node.isNil: return ""

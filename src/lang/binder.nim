@@ -43,7 +43,7 @@ type
       of boundRoot:
          main*: Bound
       of boundLiteral:
-         value*: ValueBase
+         value*: Value
          valueNode*: Node
       of boundIdentifier:
          identifier*: Identifier
@@ -63,21 +63,21 @@ type
          rvalue*: Bound
       of boundDefinition:
          defIdentifier*: Identifier
-         defDtype*: Dtype # same as defIdentifier.dtype
+         defDtype*: Dtype           # same as defIdentifier.dtype
          defInitialization*: Bound
       of boundFunctionCall:
          callIdentifier*: Identifier
          callArguments*: seq[Bound]
       of boundConditional:
          conditionToken*: Token
-         condition*: Bound  # nil for "else"
+         condition*: Bound          # nil for "else"
          conditional*: Bound
-         otherwise*: Bound  # if "elif" or "else" is present
+         otherwise*: Bound          # if "elif" or "else" is present
       of boundWhileLoop:
          whileCondition*: Bound
          whileBody*: Bound
       of boundReturn:
-         returnExpr*: Bound # may be nil
+         returnExpr*: Bound         # may be nil
       of boundBlock:
          blockExpressions*: seq[Bound]
       of boundLabel, boundGoto:
@@ -277,14 +277,14 @@ func bindLiteralExpression(parent: Bound, node: Node): Bound =
    result = Bound(kind: boundLiteral, parent: parent, binder: parent.binder, node: node)
    case node.literal.kind
    of tokenNumber:
-      result.value = node.literal.value
+      result.value = Value(pos: node.pos, dtype: newDtype(tint), valInt: node.literal.valInt)
    of tokenTrue, tokenFalse:
-      result.value = ValueBase(dtypeBase: tbool, valBool: node.literal.kind == tokenTrue)
+      result.value = Value(pos: node.pos, dtype: newDtype(tbool), valBool: node.literal.kind == tokenTrue)
    of tokenString:
-      result.value = node.literal.value
+      result.value = Value(pos: node.pos, dtype: newDtype(tstr), valStr: node.literal.valStr)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literal.kind))
-   result.dtype = newDtype(result.value.dtypeBase)
+   result.dtype = result.value.dtype
    result.valueNode = node
 
 func bindIdentifierExpression(parent: Bound, node: Node): Bound =

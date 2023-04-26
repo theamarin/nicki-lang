@@ -1,5 +1,5 @@
 import strutils, strformat, hashes, tables
-import binder, lexer, identifiers, diagnostics
+import binder, identifiers, diagnostics
 
 type
    Edge = ref object
@@ -30,7 +30,7 @@ func connect(`from`, `to`: Block, condition: Bound = nil) =
 
 func negate(condition: Bound): Bound =
    if condition.kind == boundLiteral:
-      let newValue = ValueBase(dtypeBase: tbool, valBool: not condition.value.valBool)
+      let newValue = Value(dtype: newDtype(tbool), valBool: not condition.value.valBool)
       result = Bound(kind: boundLiteral, value: newValue)
       result.inherit(condition)
    else:

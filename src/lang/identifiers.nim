@@ -1,4 +1,4 @@
-import tables, hashes
+import tables, hashes, strutils
 import diagnostics
 
 type
@@ -94,3 +94,34 @@ func `$`*(id: Identifier): string =
 
 func asTree*(id: Identifier): string = $id
 func asCode*(id: Identifier): string = id.name
+
+
+type
+   Value* = ref object
+      pos*: Position
+      dtype*: Dtype
+      valBool*: bool
+      valInt*: int
+      valStr*: string
+      valEnum*: int
+      structMembers*: seq[Value]
+
+
+func `$`*(val: Value): string =
+   case val.dtype.base
+   of terror: return "[error]"
+   of tvoid: return "[void]"
+   of tbool: return $val.valBool
+   of tint: return $val.valInt
+   of tstr: return $val.valStr
+   of ttype: return $val.dtype
+   of tfunc: return "[func]"
+   of tstruct:
+      var res: seq[string]
+      for member in val.structMembers:
+         res.add($member)
+      return "{" & res.join(", ") & "}"
+   of tenum: return "[enum]"
+
+func asCode*(val: Value): string = $val
+func asTree*(val: Value): string = $val
