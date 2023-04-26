@@ -91,7 +91,6 @@ type
       root*: Bound
       diagnostics*: Diagnostics
       scope*: BoundScope
-      baseTypes: Table[DtypeBase, Dtype]
       nextLabel*: int
 
 func `$`*(self: BoundLabel): string = return self.name
@@ -139,13 +138,13 @@ func tryDeclare*(self: Bound, identifier: Identifier): bool {.discardable.} =
    let bound = self.getScope()
    if identifier.name in bound.scope.identifiers:
       let existing = bound.scope.identifiers[identifier.name]
-      if identifier.dtype.base == tfunc:
+      if identifier.isComposedType(tfunc):
          if identifier.dtype != existing.dtype:
             self.binder.diagnostics.reportConflictingTypes(identifier.pos, identifier.name)
             self.binder.diagnostics.reportDefinitionHint(existing.pos, existing.name)
             return false
-         elif identifier.dtype.hasImplementation:
-            if existing.dtype.hasImplementation:
+         elif identifier.dtype.composed.hasImplementation:
+            if existing.dtype.composed.hasImplementation:
                self.binder.diagnostics.reportMultipleImplementations(identifier.pos,
                      identifier.name)
                self.binder.diagnostics.reportDefinitionHint(existing.pos, existing.name)
@@ -169,14 +168,20 @@ func tryLookup*(self: Bound, name: string): Identifier =
    elif bound.parent != nil: return bound.parent.tryLookup(name)
    else: return nil
 
-func toIdentifier(dtype: Dtype): Identifier =
-   return Identifier(name: $dtype.base, dtype: Dtype(base: ttype, dtype: dtype))
+func toIdentifier(dtype: Dtype, name: string): Identifier =
+   return Identifier(name: name, dtype: dtype)
+
+func newTypeDtype(dtype: Dtype, name = ""): Dtype =
+   return Dtype(base: tcomposed, composed: ComposedDtype(name: name, kind: ttype, dtype: dtype))
+
 
 func addBaseDtypes*(self: Bound) =
    for dtypeBase in DtypeBase:
-      let dtype = Dtype(base: dtypeBase)
-      self.binder.baseTypes[dtypeBase] = dtype
-      discard self.tryDeclare(toIdentifier(dtype))
+      if dtypeBase == tcomposed: continue
+      let dtype = newTypeDtype(Dtype(base: dtypeBase), $dtypeBase)
+      doAssert self.tryDeclare(toIdentifier(dtype, $dtypeBase))
+   var ids: seq[string]
+   for id, ident in self.scope.identifiers: ids.add($id)
 
 func pos*(node: Bound): Position =
    if not node.node.isNil: return node.node.pos
@@ -256,11 +261,11 @@ func toDtype*(bound: Bound, dtypeToken: Token): Dtype =
    let id = bound.tryLookup(dtypeToken.text)
    if id == nil:
       bound.binder.diagnostics.reportUndefinedIdentifier(dtypeToken.pos, dtypeToken.text)
-      return newDtype(terror, bound.pos)
-   elif id.dtype.base != ttype:
+      return Dtype(base: terror)
+   elif id.isComposedType(ttype):
+      return id.dtype.composed.dtype
+   else:
       bound.binder.diagnostics.reportWrongIdentifier(dtypeToken.pos, $id.dtype.base, $ttype)
-   else: return newDtype(id.dtype.dtype)
-
 
 
 func bindExpression*(bound: Bound, node: Node, requireValue = true): Bound
@@ -277,14 +282,14 @@ func bindLiteralExpression(parent: Bound, node: Node): Bound =
    result = Bound(kind: boundLiteral, parent: parent, binder: parent.binder, node: node)
    case node.literal.kind
    of tokenNumber:
-      result.value = Value(pos: node.pos, dtype: newDtype(tint), valInt: node.literal.valInt)
+      result.value = Value(pos: node.pos, base: tint, valInt: node.literal.valInt)
    of tokenTrue, tokenFalse:
-      result.value = Value(pos: node.pos, dtype: newDtype(tbool), valBool: node.literal.kind == tokenTrue)
+      result.value = Value(pos: node.pos, base: tbool, valBool: node.literal.kind == tokenTrue)
    of tokenString:
-      result.value = Value(pos: node.pos, dtype: newDtype(tstr), valStr: node.literal.valStr)
+      result.value = Value(pos: node.pos, base: tstr, valStr: node.literal.valStr)
    else: raise (ref Exception)(msg: "Unexpected literal " & escape(
          $node.literal.kind))
-   result.dtype = result.value.dtype
+   result.dtype = Dtype(base: result.value.base)
    result.valueNode = node
 
 func bindIdentifierExpression(parent: Bound, node: Node): Bound =
@@ -345,12 +350,14 @@ func bindParameter(bound: Bound, node: Node): Identifier =
 func bindStructExpression(parent: Bound, node: Node): Bound =
    assert node.kind == structExpression
    result = Bound(kind: boundStruct, parent: parent, binder: parent.binder, node: node)
-   result.dtype = newDtype(ttype)
-   result.dtype.dtype = newDtype(tstruct)
+   let composed = ComposedDtype(pos: Position(), kind: tstruct)
+   result.scope = BoundScope()
    for member in node.structDefinitions:
       let boundMember = result.bindDefinitionExpression(member)
-      result.structMembers.add(boundMember)
-      result.dtype.dtype.members.add(boundMember.defIdentifier)
+      composed.members.add(boundMember.defIdentifier)
+   let dtype = Dtype(base: tcomposed, composed: composed)
+   let dtypeType = newTypeDtype(dtype)
+   result.dtype = dtypeType
 
 func bindVariableDefinitonExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
@@ -372,18 +379,19 @@ func bindFunctionDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.defParameterOpen != nil
    result = Bound(kind: boundDefinition, parent: parent, binder: parent.binder, node: node)
    result.dtype = newDtype(tvoid)
-   result.defDtype = newDtype(tfunc)
+   let composed = ComposedDtype(name: node.defIdentifier.text, pos: node.defIdentifier.pos, kind: tfunc)
+   result.defDtype = Dtype(base: tcomposed, composed: composed)
    result.scope = BoundScope(functionContext: result)
    for parameter in node.defParameters:
       let p = result.bindParameter(parameter)
-      result.defDtype.parameters.add(p)
+      composed.parameters.add(p)
       result.tryDeclare(p)
    if node.defDtype != nil:
-      result.defDtype.retDtype = result.toDtype(node.defDtype)
-   else: result.defDtype.retDtype = newDtype(tvoid)
+      composed.retDtype = result.toDtype(node.defDtype)
+   else: composed.retDtype = newDtype(tvoid)
    if node.defAssignExpression != nil:
       result.defInitialization = result.bindBlockExpression(node.defAssignExpression)
-      result.defDtype.hasImplementation = true
+      composed.hasImplementation = true
 
 func bindDefinitionExpression(parent: Bound, node: Node): Bound =
    assert node.kind == definitionExpression
@@ -403,16 +411,17 @@ func bindCallExpression(parent: Bound, node: Node): Bound =
       result.binder.diagnostics.reportUndefinedIdentifier(node.callIdentifier.pos,
             node.callIdentifier.text)
       result.dtype = newDtype(terror)
-   elif result.callIdentifier.dtype.base != tfunc:
+   elif not result.callIdentifier.isComposedType(tfunc):
       result.binder.diagnostics.reportCannotCast(result.callIdentifier.pos,
             $result.callIdentifier.dtype, "func")
    else:
-      result.dtype = result.callIdentifier.dtype.retDtype
-      let parameters = result.callIdentifier.dtype.parameters
+      let dtype = result.callIdentifier.dtype.composed
+      result.dtype = dtype.retDtype
+      let parameters = dtype.parameters
       if node.callArguments.len != parameters.len:
          result.binder.diagnostics.reportWrongNumberOfArguments(result.callIdentifier.pos,
                node.callArguments.len, parameters.len)
-      elif not result.callIdentifier.dtype.hasImplementation:
+      elif not dtype.hasImplementation:
          result.binder.diagnostics.reportMissingImplementation(node.callIdentifier.pos,
                node.callIdentifier.text)
          result.binder.diagnostics.reportDefinitionHint(result.callIdentifier.pos,
@@ -472,12 +481,12 @@ func bindReturnExpression(parent: Bound, node: Node): Bound =
       return
    if node.returnExpr != nil:
       result.returnExpr = result.bindExpression(node.returnExpr)
-      result.dtype = newDtype(result.returnExpr.dtype)
+      result.dtype = result.returnExpr.dtype
    else:
       result.dtype = newDtype(tvoid)
-   if result.dtype != functionContext.defDtype.retDtype:
+   if result.dtype != functionContext.defDtype.composed.retDtype:
       result.binder.diagnostics.reportCannotCast(node.returnToken.pos, $result.dtype,
-            $functionContext.defDtype.retDtype)
+            $functionContext.defDtype.composed.retDtype)
 
 func bindBlockExpression(parent: Bound, node: Node): Bound =
    assert node.kind == blockExpression

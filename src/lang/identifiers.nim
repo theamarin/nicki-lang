@@ -3,27 +3,20 @@ import diagnostics
 
 type
    DtypeBase* = enum
-      # Error type (on binding/inference error)
-      terror = "[error]"
-      # Built-in data types
-      tvoid = "void"
-      tbool = "bool"
-      tint = "int"
-      tstr = "str"
-      # Derived types (need more info)
-      ttype = "type"
-      tfunc = "func"
-      tstruct = "struct"
-      tenum = "enum"
+      terror = "error",
+      tvoid = "void",
+      tbool = "bool",
+      tint = "int",
+      tstr = "str",
+      tcomposed = "composed"
 
-const
-   basicDtypes* = {tvoid, tbool, tint, tstr}
+   ComposedDtypeKind* = enum
+      ttype = "type", tfunc = "func", tstruct = "struct", tenum = "enum"
 
-type
-   Dtype* = ref object
+   ComposedDtype* = ref object
+      name*: string
       pos*: Position
-      case base*: DtypeBase
-      of terror, basicDtypes: discard
+      case kind*: ComposedDtypeKind
       of ttype:
          dtype*: Dtype
       of tfunc:
@@ -35,10 +28,35 @@ type
       of tenum:
          enumerals*: OrderedTable[int, string]
 
+   DtypeFlags* = enum
+      dfConst, dfDiscardable
+
+   Dtype* = ref object
+      case base*: DtypeBase
+      of terror, tvoid, tbool, tint, tstr: discard
+      of tcomposed: composed*: ComposedDtype
+
    Identifier* = ref object
       name*: string
       pos*: Position
       dtype*: Dtype
+
+   ComposedValue* = object
+      case kind*: ComposedDtypeKind
+      of ttype: dtype*: Dtype
+      of tfunc: discard
+      of tstruct: valStruct*: OrderedTable[Identifier, Value]
+      of tenum: valEnum*: int
+
+   Value* = ref object
+      pos*: Position
+      case base*: DtypeBase
+      of terror, tvoid: discard
+      of tbool: valBool*: bool
+      of tint: valInt*: int
+      of tstr: valStr*: string
+      of tcomposed: composed*: ComposedValue
+
 
 func hash*(self: Identifier): Hash =
    return cast[pointer](self).hash
@@ -48,13 +66,21 @@ func `==`*(l, r: Dtype): bool =
    # TODO: Check equality for derived types!
    return true
 
+func isComposedType*(dtype: Dtype, kind: ComposedDtypeKind): bool =
+   if dtype.base != tcomposed: return false
+   return dtype.composed.kind == kind
 
-func `$`*(dtype: Dtype): string =
-   result = $dtype.base
-   case dtype.base
-   of terror, basicDtypes: discard
+func isComposedType*(identifier: Identifier, kind: ComposedDtypeKind): bool =
+   return identifier.dtype.isComposedType(kind)
+
+func `$`*(dtype: Dtype): string
+func `$`*(dtype: ComposedDtype): string =
+   assert not dtype.isNil, "composed dtype is nil"
+   case dtype.kind
    of ttype:
-      if not dtype.dtype.isNil: result &= "<" & $dtype.dtype & ">"
+      result = "type"
+      if not dtype.dtype.isNil:
+         result &= "<" & $dtype.dtype & ">"
    of tfunc:
       if not dtype.retDtype.isNil:
          result &= "("
@@ -63,31 +89,18 @@ func `$`*(dtype: Dtype): string =
             result &= p.name & ": " & $p.dtype
          result &= "): " & $dtype.retDtype
          # if dtype.hasImplementation: result &= " = [implementation]"
-   of tstruct: discard
-   of tenum: discard
+   of tstruct: result &= "struct"
+   of tenum: result &= "enum"
+
+func `$`*(dtype: Dtype): string =
+   case dtype.base
+   of terror, tvoid, tbool, tint, tstr: return $dtype.base
+   of tcomposed: return $dtype.composed
 
 func asTree*(dtype: Dtype): string = $dtype
 func asCode*(dtype: Dtype): string = $dtype
 
-func newDtype*(base: DtypeBase, pos: Position = Position()): Dtype =
-   return Dtype(pos: pos, base: base)
-
-func newDtype*(dtype: Dtype, pos: Position = Position()): Dtype =
-   let myPos = if pos.abs != 0: pos else: dtype.pos
-   result = Dtype(base: dtype.base, pos: myPos)
-   case result.base
-   of terror, basicDtypes: discard
-   of ttype:
-      result.dtype = dtype.dtype
-   of tfunc:
-      result.retDtype = dtype.retDtype
-      result.parameters = dtype.parameters
-      result.hasImplementation = dtype.hasImplementation # tbd
-   of tstruct:
-      result.members = dtype.members
-   of tenum:
-      result.enumerals = dtype.enumerals
-
+func newDtype*(base: DtypeBase): Dtype = return Dtype(base: base)
 
 func `$`*(id: Identifier): string =
    return id.name & ": " & $id.dtype
@@ -96,32 +109,26 @@ func asTree*(id: Identifier): string = $id
 func asCode*(id: Identifier): string = id.name
 
 
-type
-   Value* = ref object
-      pos*: Position
-      dtype*: Dtype
-      valBool*: bool
-      valInt*: int
-      valStr*: string
-      valEnum*: int
-      structMembers*: seq[Value]
-
+func `$`*(val: Value): string
+func `$`*(val: ComposedValue): string =
+   case val.kind
+   of ttype: return $val.dtype
+   of tfunc: return "[func]"
+   of tstruct:
+      var res: seq[string]
+      for identifier, value in val.valStruct:
+         res.add(identifier.name & ": " & $value)
+      return "{" & res.join(", ") & "}"
+   of tenum: return "[enum]"
 
 func `$`*(val: Value): string =
-   case val.dtype.base
+   case val.base
    of terror: return "[error]"
    of tvoid: return "[void]"
    of tbool: return $val.valBool
    of tint: return $val.valInt
    of tstr: return $val.valStr
-   of ttype: return $val.dtype
-   of tfunc: return "[func]"
-   of tstruct:
-      var res: seq[string]
-      for member in val.structMembers:
-         res.add($member)
-      return "{" & res.join(", ") & "}"
-   of tenum: return "[enum]"
+   of tcomposed: return $val.composed
 
 func asCode*(val: Value): string = $val
 func asTree*(val: Value): string = $val

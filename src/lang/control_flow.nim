@@ -30,7 +30,7 @@ func connect(`from`, `to`: Block, condition: Bound = nil) =
 
 func negate(condition: Bound): Bound =
    if condition.kind == boundLiteral:
-      let newValue = Value(dtype: newDtype(tbool), valBool: not condition.value.valBool)
+      let newValue = Value(base: tbool, valBool: not condition.value.valBool)
       result = Bound(kind: boundLiteral, value: newValue)
       result.inherit(condition)
    else:
@@ -167,7 +167,7 @@ proc checkControlFlow(node: Bound) =
    if not controlFlow[^1].visited:
       node.binder.diagnostics.reportCannotReturn(node.defIdentifier.pos)
 
-   if node.defDtype.retDtype.base != tvoid:
+   if node.defDtype.composed.retDtype.base != tvoid:
       if not controlFlow.allPathsReturnValue():
          node.binder.diagnostics.reportNotAllPathsReturnValue(node.defIdentifier.pos)
 
@@ -181,7 +181,7 @@ proc checkControlFlow(node: Bound) =
 proc checkControlFlows*(node: Bound) =
    case node.kind
    of boundDefinition:
-      if node.defDtype.base == tfunc:
+      if node.defDtype.isComposedType(tfunc):
          node.checkControlFlow()
    of boundBlock:
       for e in node.blockExpressions: e.checkControlFlows()

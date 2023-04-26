@@ -16,7 +16,7 @@ func `$`*(self: Variable): string =
    result = $self.value
 
 func typeStr*(self: Variable): string =
-   result = $self.value.dtype
+   result = $self.value.base
 
 func tryLookup*(self: Evaluator, identifier: Identifier): Variable =
    if identifier in self.variables: return self.variables[identifier]
@@ -24,10 +24,13 @@ func tryLookup*(self: Evaluator, identifier: Identifier): Variable =
    else: raise (ref KeyError)(msg: "Undefined identifier " & escape(identifier.name))
 
 func typeVariable(base: DtypeBase): Variable =
-   Variable(value: Value(dtype: Dtype(base: ttype, dtype: newDtype(base))))
+   Variable(value: Value(base: tcomposed, composed: ComposedValue(kind: ttype, dtype: newDtype(base))))
 
 func addBaseDtypes*(self: Evaluator, bound: Bound) =
+   var ids: seq[string]
+   for id, ident in bound.scope.identifiers: ids.add($id)
    for dtypeBase in DtypeBase:
+      if dtypeBase == tcomposed: continue
       let identifier = bound.scope.identifiers[$dtypeBase]
       self.variables[identifier] = typeVariable(dtypeBase)
 
@@ -53,7 +56,7 @@ func evaluateBinaryOperator(self: Evaluator, node: Bound): Value =
          if (left > right).valBool: 1
          elif (left < right).valBool: -1
          else: 0
-      return Value(dtype: Dtype(base: tint), valInt: res)
+      return Value(base: tint, valInt: res)
    of boundBinaryLogicalAnd: return left and right
    of boundBinaryLogicalOr: return left or right
    of boundBinaryLogicalXor: return left xor right
@@ -67,7 +70,7 @@ func evaluateBlock*(self: Evaluator, node: Bound): Value =
       if expression.kind == boundLabel:
          labelToIndex[expression.label] = index
 
-   var lastValue = Value(dtype: newDtype(tvoid))
+   var lastValue = Value(base: tvoid)
    var index = 0
    while index < node.blockExpressions.len:
       var expression = node.blockExpressions[index]
@@ -92,8 +95,8 @@ func evaluateBlock*(self: Evaluator, node: Bound): Value =
 
 func evaluate*(self: Evaluator, node: Bound): Value =
    case node.kind
-   of boundError: return Value(dtype: Dtype(base: terror))
-   of boundRoot: return Value(dtype: Dtype(base: terror))
+   of boundError: return Value(base: terror)
+   of boundRoot: return Value(base: terror)
    of boundLiteral: return node.value
    of boundIdentifier: return self.tryLookup(node.identifier).value
    of boundUnaryOperator:
@@ -104,33 +107,33 @@ func evaluate*(self: Evaluator, node: Bound): Value =
    of boundBinaryOperator:
       return self.evaluateBinaryOperator(node)
    of boundStruct:
-      return Value(pos: node.pos, dtype: node.dtype)
+      return Value(pos: node.pos, base: node.dtype.base)
    of boundAssignment:
       let rvalue = self.evaluate(node.rvalue)
       let variable = self.tryLookup(node.lvalue)
       variable.value = rvalue
       return rvalue
    of boundDefinition:
-      var value = Value(dtype: node.defDtype)
-      if node.defDtype.base == tfunc:
-         let variable = Variable(value: Value(dtype: node.defDtype),
+      var value = Value(base: node.defDtype.base)
+      if node.defDtype.isComposedType(tfunc):
+         let variable = Variable(value: Value(base: node.defDtype.base),
                implementation: node.defInitialization)
          self.variables[node.defIdentifier] = variable
       else:
          if node.defInitialization != nil:
             value = self.evaluate(node.defInitialization)
          self.variables[node.defIdentifier] = Variable(value: value)
-      return Value(dtype: Dtype(base: tvoid))
+      return Value(base: tvoid)
    of boundFunctionCall:
       case node.callIdentifier.name
       of "print":
          let val = self.evaluate(node.callArguments[0])
          debugEcho $val
-         return Value(dtype: Dtype(base: tvoid))
+         return Value(base: tvoid)
       else:
          let impl = self.tryLookup(node.callIdentifier).implementation
          var scope = Evaluator(parent: self)
-         for idx, p in node.callIdentifier.dtype.parameters:
+         for idx, p in node.callIdentifier.dtype.composed.parameters:
             let arg = self.evaluate(node.callArguments[idx])
             scope.variables[p] = Variable(value: arg)
          assert not impl.isNil
@@ -143,13 +146,13 @@ func evaluate*(self: Evaluator, node: Bound): Value =
       elif node.otherwise != nil:
          var scope = Evaluator(parent: self)
          result = scope.evaluate(node.otherwise)
-      else: return Value(dtype: Dtype(base: tvoid))
+      else: return Value(base: tvoid)
       if node.dtype.base == tvoid:
-         return Value(dtype: Dtype(base: tvoid))
+         return Value(base: tvoid)
    of boundWhileLoop:
       while self.evaluate(node.whileCondition).valBool:
          discard self.evaluate(node.whileBody)
-      return Value(dtype: Dtype(base: tvoid))
+      return Value(base: tvoid)
    of boundBlock:
       return self.evaluateBlock(node)
    else:

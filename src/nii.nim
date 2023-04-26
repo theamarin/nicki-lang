@@ -43,7 +43,7 @@ if context.sourceText.filename.len > 0:
       quit(QuitFailure)
 
    let result = evaluate(context.evaluator, bound)
-   if result.dtype.base notin {tvoid, terror}: writeline(stdout, $result)
+   if result.base notin {tvoid, terror}: writeline(stdout, $result)
 
    quit(QuitSuccess)
 
@@ -79,4 +79,4 @@ while true:
    if bound.kind == boundError: continue
 
    let result = evaluate(context.evaluator, bound)
-   if result.dtype.base notin {tvoid, terror}: writeline(stdout, $result)
+   if result.base notin {tvoid, terror}: writeline(stdout, $result)

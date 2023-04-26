@@ -11,7 +11,7 @@ proc run(filename: string): bool =
    if bound.kind == boundError: return false
 
    let evalResult = evaluate(context.evaluator, bound)
-   if evalResult.dtype.base == terror: return false
+   if evalResult.base == terror: return false
 
    return true
 
