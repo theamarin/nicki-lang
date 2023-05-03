@@ -107,20 +107,24 @@ func evaluate*(self: Evaluator, node: Bound): Value =
    of boundBinaryOperator:
       return self.evaluateBinaryOperator(node)
    of boundStruct:
-      return Value(pos: node.pos, base: node.dtype.base)
+      doAssert node.dtype.isComposedType(ttype)
+      let s = ComposedValue(kind: ttype, dtype: node.dtype)
+      return Value(pos: node.pos, base: tcomposed, composed: s)
    of boundAssignment:
       let rvalue = self.evaluate(node.rvalue)
       let variable = self.tryLookup(node.lvalue)
       variable.value = rvalue
       return rvalue
    of boundDefinition:
-      var value = Value(base: node.defDtype.base)
       if node.defDtype.isComposedType(tfunc):
          let variable = Variable(value: Value(base: node.defDtype.base),
                implementation: node.defInitialization)
          self.variables[node.defIdentifier] = variable
       else:
-         if node.defInitialization != nil:
+         var value: Value
+         if node.defInitialization.isNil:
+            value = node.defDtype.toValue()
+         else:
             value = self.evaluate(node.defInitialization)
          self.variables[node.defIdentifier] = Variable(value: value)
       return Value(base: tvoid)

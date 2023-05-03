@@ -63,7 +63,7 @@ func hash*(self: Identifier): Hash =
 
 func `==`*(l, r: Dtype): bool =
    if l.base != r.base: return false
-   # TODO: Check equality for derived types!
+   if l.base == tcomposed and l.composed != r.composed: return false
    return true
 
 func isComposedType*(dtype: Dtype, kind: ComposedDtypeKind): bool =
@@ -89,7 +89,10 @@ func `$`*(dtype: ComposedDtype): string =
             result &= p.name & ": " & $p.dtype
          result &= "): " & $dtype.retDtype
          # if dtype.hasImplementation: result &= " = [implementation]"
-   of tstruct: result &= "struct"
+   of tstruct:
+      var s: seq[string]
+      for member in dtype.members: s.add($member.dtype)
+      result &= "struct<" & s.join(",") & ">"
    of tenum: result &= "enum"
 
 func `$`*(dtype: Dtype): string =
@@ -101,6 +104,20 @@ func asTree*(dtype: Dtype): string = $dtype
 func asCode*(dtype: Dtype): string = $dtype
 
 func newDtype*(base: DtypeBase): Dtype = return Dtype(base: base)
+
+func toValue*(dtype: Dtype): Value =
+   if dtype.base == tcomposed:
+      var composed = ComposedValue(kind: dtype.composed.kind)
+      case dtype.composed.kind
+      of ttype: composed.dtype = dtype.composed.dtype
+      of tfunc: discard
+      of tstruct:
+         for member in dtype.composed.members:
+            composed.valStruct[member] = member.dtype.toValue()
+      of tenum: composed.valEnum = 0
+      return Value(base: tcomposed, composed: composed)
+   else:
+      return Value(base: dtype.base)
 
 func `$`*(id: Identifier): string =
    return id.name & ": " & $id.dtype
